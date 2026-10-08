@@ -1,0 +1,615 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="theme-color" content="#2A4A7C"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="にほんご"><link rel="manifest" href="../manifest.webmanifest"><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="icon" type="image/png" href="../icons/icon-192.png"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; font: 14px system-ui, sans-serif; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+.appnav { display: flex; justify-content: space-between; gap: 8px; }
+.appnav a { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: inherit; text-decoration: none; padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(127,127,127,.35); min-height: 40px; }
+.appnav a.home { border-color: transparent; opacity: .75; padding-inline: 4px; }
+</style>
+<script>
+// Android back button: let the page close its own sub-view first, otherwise go to the home screen (or exit from it).
+document.addEventListener('DOMContentLoaded', () => {
+  const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (!App) return;
+  // "Share → にほんご 연습장" from a browser: hand the shared URL/text to the reader.
+  const SR = window.Capacitor.Plugins.ShareReceiver;
+  if (SR) SR.addListener('shared', d => {
+    if (!d || !d.text) return;
+    try { localStorage.setItem('reader-share', JSON.stringify({ text: d.text, subject: d.subject || '', t: Date.now() })); } catch (e) {}
+    SR.takePending().catch(() => {});
+    if (/\/read\//.test(location.pathname) && typeof window.onShared === 'function') window.onShared();
+    else location.href = (/\/(study|kanji)\//.test(location.pathname) ? '../' : '') + 'read/index.html?share=1';
+  });
+  // Tapping the morning news notification opens today's news in the reader.
+  const LN = window.Capacitor.Plugins.LocalNotifications;
+  if (LN) LN.addListener('localNotificationActionPerformed', ev => {
+    const n = ev && ev.notification;
+    if (!(n && n.extra && n.extra.open === 'news')) return;
+    if (/\/read\//.test(location.pathname)) { location.hash = 'news'; const s = document.getElementById('news'); if (s) s.scrollIntoView(); }
+    else location.href = (/\/(study|kanji)\//.test(location.pathname) ? '../' : '') + 'read/index.html#news';
+  });
+  App.addListener('backButton', () => {
+    if (typeof window.appBack === 'function' && window.appBack()) return;
+    if (/\/(study|kanji|read)\//.test(location.pathname)) location.href = '../index.html';
+    else App.exitApp();
+  });
+});
+</script><script>if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => navigator.serviceWorker.register('../sw.js').catch(() => {}));</script></head><body>
+<title>漢字 쓰기 노트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<style>
+/* Layout: a calligraphy practice notebook — info column (meaning, readings, model) beside one large square practice cell with red 十-guides; stacks on narrow screens */
+:root {
+  --paper: #F5F6F3;
+  --sheet: #FFFFFF;
+  --ink: #1D1F26;
+  --muted: #5E6573;
+  --line: #DCE0E6;
+  --guide: #E4A598;       /* 朱 guide lines of a 習字 notebook */
+  --ghost: #C9CDD6;       /* trace template */
+  --ai: #2A4A7C;
+  --ai-soft: #E5ECF6;
+  --ai-ink: #FFFFFF;
+  --ok: #2E7A4D;
+  --ok-soft: #E3F2E8;
+  --bad: #C0442C;
+  --bad-soft: #F8E6E1;
+  --jp: "Klee One", "Yu Mincho", "Hiragino Mincho ProN", serif;
+  --ko: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101318; --sheet: #191D24; --ink: #ECEEF2; --muted: #9AA3B2; --line: #2B3240;
+    --guide: #7A4A44; --ghost: #3C4352; --ai: #8DAEE6; --ai-soft: #1D2A40; --ai-ink: #101318;
+    --ok: #6CC090; --ok-soft: #173326; --bad: #EB8C76; --bad-soft: #3A1E19; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101318; --sheet: #191D24; --ink: #ECEEF2; --muted: #9AA3B2; --line: #2B3240;
+  --guide: #7A4A44; --ghost: #3C4352; --ai: #8DAEE6; --ai-soft: #1D2A40; --ai-ink: #101318;
+  --ok: #6CC090; --ok-soft: #173326; --bad: #EB8C76; --bad-soft: #3A1E19; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: var(--ko); font-size: 15px; line-height: 1.55; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--ai); outline-offset: 2px; }
+.jp { font-family: var(--jp); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 14px 28px; display: flex; flex-direction: column; gap: 12px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; justify-content: space-between; }
+.top h1 { margin: 0; font-family: var(--jp); font-size: 26px; font-weight: 600; letter-spacing: .04em; }
+.top h1 span { font-family: var(--ko); font-size: 18px; color: var(--muted); margin-left: 6px; font-weight: 600; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--sheet); }
+.seg button { border: 0; background: transparent; padding: 8px 14px; font-size: 14px; color: var(--muted); min-height: 40px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ai); color: var(--ai-ink); font-weight: 600; }
+.btn { border: 1px solid var(--line); background: var(--sheet); border-radius: 10px; padding: 9px 16px; min-height: 44px; font-weight: 500; }
+.btn:hover { border-color: var(--ai); }
+.btn.primary { background: var(--ai); border-color: var(--ai); color: var(--ai-ink); }
+.btn:disabled { opacity: .45; cursor: default; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); min-height: 40px; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--ai); }
+.today { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.today b { color: var(--ink); font-size: 16px; }
+
+.desk { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 820px) { .desk { grid-template-columns: 1fr; } }
+.info { background: var(--sheet); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.info .mean { font-size: 22px; font-weight: 600; line-height: 1.3; }
+.info .meta { font-size: 12px; color: var(--muted); }
+.model { width: 100%; max-width: 220px; aspect-ratio: 1; align-self: center; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); position: relative; }
+.model svg { width: 100%; height: 100%; display: block; }
+.model .hidden { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 12px; }
+dl.rd { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
+dl.rd dt { font-size: 12px; color: var(--muted); padding-top: 3px; }
+dl.rd dd { margin: 0; font-family: var(--jp); font-size: 17px; overflow-wrap: anywhere; }
+.words { display: flex; flex-direction: column; gap: 4px; }
+.words div { display: flex; gap: 8px; align-items: baseline; font-size: 14px; flex-wrap: wrap; }
+.words b { font-family: var(--jp); font-size: 18px; font-weight: 600; }
+.words span { color: var(--muted); }
+.label { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .06em; }
+
+.pad { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cellwrap { position: relative; width: 100%; max-width: min(100%, 78vh); margin-inline: auto; aspect-ratio: 1; }
+canvas#cell { width: 100%; height: 100%; display: block; border-radius: 6px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: crosshair; box-shadow: 0 0 0 1px var(--guide); }
+.status { min-height: 26px; text-align: center; font-size: 15px; font-weight: 500; }
+.status.ok { color: var(--ok); } .status.bad { color: var(--bad); } .status.info { color: var(--muted); }
+.banner { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ok-soft); color: var(--ok); border: 1px solid var(--ok); border-radius: 999px; padding: 6px 16px; font-weight: 600; font-size: 15px; white-space: nowrap; pointer-events: none; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.nav { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+.nav .pos { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* list */
+.listpanel { background: var(--sheet); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; }
+.grid button { aspect-ratio: 1; border: 1px solid var(--line); background: var(--paper); border-radius: 8px; font-family: var(--jp); font-size: 26px; display: grid; place-items: center; position: relative; padding: 0; }
+.grid button.prac { border-color: var(--ai); }
+.grid button.mem { background: var(--ai); color: var(--ai-ink); border-color: var(--ai); }
+.grid button small { position: absolute; right: 4px; bottom: 2px; font-family: var(--ko); font-size: 10px; color: var(--muted); }
+.grid button.mem small { color: var(--ai-ink); opacity: .8; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); vertical-align: -2px; margin-right: 4px; background: var(--paper); }
+.foot { text-align: center; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.foot a { color: inherit; }
+#measure { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; }
+</style>
+
+<div class="wrap">
+  <nav class="appnav"><a class="home" href="../index.html">⌂ 공부 앱</a><a href="https://claude.ai/artifact/12q5g8FM72PHCfZnAu6GAe" target="_blank" rel="noopener">読 읽기 도우미 ↗</a></nav>
+  <header class="top">
+    <h1>漢字<span>쓰기 노트</span></h1>
+    <div class="seg" id="levels" role="group" aria-label="급수"></div>
+    <div class="today" id="today"></div>
+  </header>
+
+  <div class="row" style="justify-content:space-between">
+    <div class="seg" id="modes" role="group" aria-label="연습 방법">
+      <button data-m="trace">따라 쓰기</button>
+      <button data-m="look">보고 쓰기</button>
+      <button data-m="memory">외워 쓰기</button>
+    </div>
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="penonly"> 펜으로만 쓰기</label>
+      <label class="toggle"><input type="checkbox" id="strict"> 획순 채점</label>
+      <button class="btn" id="listbtn">글자 목록</button>
+    </div>
+  </div>
+
+  <main id="main"></main>
+
+  <div class="foot">
+    <span id="sync">연습 기록은 이 기기에 저장돼요.</span>
+    <span>획순: <a href="https://kanjivg.tagaini.net" target="_blank" rel="noopener">KanjiVG</a> (Ulrich Apel, CC BY-SA 3.0) · 뜻·읽기: JLPT 통합덱 상용한자</span>
+  </div>
+</div>
+<svg id="measure" viewBox="0 0 109 109" aria-hidden="true"></svg>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const todayStr = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
+const N = 109;              // KanjiVG coordinate box
+const SAMPLES = 40;
+
+// ---------------- progress ----------------
+const LS_KEY = 'kanji-write-v1';
+let prog = { level: 'N4', idx: {}, cnt: {}, mem: [], days: {} };
+try { const raw = lsGet(LS_KEY); if (raw) prog = Object.assign(prog, JSON.parse(raw)); } catch (e) {}
+let memSet = new Set(prog.mem);
+function plainProg() { prog.mem = [...memSet]; return JSON.parse(JSON.stringify(prog)); }
+function mergeProg(a, b) {
+  const p = { level: a.level || b.level || 'N4', idx: Object.assign({}, b.idx, a.idx), cnt: {}, mem: [...new Set([...(a.mem || []), ...(b.mem || [])])], days: {} };
+  for (const s of [a, b]) {
+    for (const k in (s.cnt || {})) p.cnt[k] = Math.max(p.cnt[k] || 0, s.cnt[k]);
+    for (const d in (s.days || {})) p.days[d] = Math.max(p.days[d] || 0, s.days[d]);
+  }
+  return p;
+}
+let dbRef = null, saving = false, dirty = false, timer = null;
+function save() {
+  lsSet(LS_KEY, JSON.stringify(plainProg()));
+  if (!dbRef) return;
+  dirty = true; clearTimeout(timer); timer = setTimeout(flush, 1500);
+}
+async function flush() {
+  if (!dbRef || saving || !dirty) return;
+  saving = true; dirty = false;
+  try { await dbRef.set(plainProg()); }
+  catch (e) { if (e && ['invalid_argument', 'revoked', 'not_granted', 'quota_exceeded'].includes(e.code)) { dbRef = null; $('#sync').textContent = '연습 기록은 이 기기에만 저장돼요.'; } else dirty = true; }
+  saving = false;
+  if (dirty && dbRef) timer = setTimeout(flush, 2500);
+}
+
+// ---------------- settings ----------------
+// Pen-only (palm rejection): automatic unless the user sets it. Fingers work until a pen is used on this device;
+// after that, touches are ignored. An explicit checkbox choice ('1' / '0') always wins.
+let penSeen = lsGet('kw-penseen') === '1';
+const penPref = () => lsGet('kw-pen');
+const set = {
+  mode: lsGet('kw-mode') || 'trace',
+  penOnly: penPref() === '1' ? true : penPref() === '0' ? false : penSeen,
+  strict: lsGet('kw-strict') !== '0',
+};
+const penBox = $('#penonly'), strictBox = $('#strict');
+penBox.checked = set.penOnly; strictBox.checked = set.strict;
+penBox.onchange = () => { set.penOnly = penBox.checked; lsSet('kw-pen', set.penOnly ? '1' : '0'); };
+function notePen() {
+  if (penSeen) return;
+  penSeen = true; lsSet('kw-penseen', '1');
+  if (penPref() === null) { set.penOnly = true; penBox.checked = true; setMsg('펜이 감지돼서 "펜으로만 쓰기"를 켰어요. 손바닥이 닿아도 선이 그어지지 않아요.', 'info'); }
+}
+strictBox.onchange = () => { set.strict = strictBox.checked; lsSet('kw-strict', set.strict ? '1' : '0'); resetCell(); render(); };
+function renderModes() { document.querySelectorAll('#modes button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === set.mode)); }
+$('#modes').onclick = e => { const b = e.target.closest('button'); if (!b) return; set.mode = b.dataset.m; lsSet('kw-mode', set.mode); renderModes(); resetCell(); render(); };
+
+// ---------------- data ----------------
+const DATA = {};
+function loadLevel(lv) {
+  if (DATA[lv]) return Promise.resolve(DATA[lv]);
+  return fetch(`data/kanji-${lv}.json`).then(r => { if (!r.ok) throw new Error(lv); return r.json(); }).then(d => (DATA[lv] = d));
+}
+const list = () => DATA[prog.level] || [];
+const curIdx = () => Math.min(prog.idx[prog.level] || 0, Math.max(0, list().length - 1));
+const cur = () => list()[curIdx()];
+
+function renderLevels() {
+  $('#levels').innerHTML = LEVELS.map(l => `<button data-lv="${l}" aria-pressed="${prog.level === l}">${l}</button>`).join('');
+}
+$('#levels').onclick = e => {
+  const b = e.target.closest('button'); if (!b || b.dataset.lv === prog.level) return;
+  prog.level = b.dataset.lv; save(); renderLevels(); view = 'pad'; boot();
+};
+function renderToday() {
+  const n = prog.days[todayStr()] || 0;
+  const lvList = list();
+  const mem = lvList.filter(x => memSet.has(x.k)).length;
+  $('#today').innerHTML = `오늘 <b>${n}</b>자 · ${prog.level} 외운 글자 <b>${mem}</b>/${lvList.length || '–'}`;
+}
+
+// ---------------- reference strokes ----------------
+let REF = [];   // [{d, path2d, pts:[{x,y}], len}]
+function prepRef(k) {
+  const svg = $('#measure');
+  svg.innerHTML = k.d.map(d => `<path d="${esc(d)}"/>`).join('');
+  REF = [...svg.querySelectorAll('path')].map((p, i) => {
+    const len = p.getTotalLength();
+    const pts = [];
+    for (let j = 0; j < SAMPLES; j++) { const q = p.getPointAtLength(len * j / (SAMPLES - 1)); pts.push({ x: q.x, y: q.y }); }
+    return { d: k.d[i], path: new Path2D(k.d[i]), pts, len };
+  });
+}
+function resample(points, n = SAMPLES) {
+  const out = [points[0]];
+  const segs = []; let total = 0;
+  for (let i = 1; i < points.length; i++) { const l = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y); segs.push(l); total += l; }
+  if (total === 0) return Array.from({ length: n }, () => ({ x: points[0].x, y: points[0].y }));
+  const step = total / (n - 1);
+  let acc = 0, i = 1, target = step;
+  while (out.length < n - 1 && i < points.length) {
+    const l = segs[i - 1];
+    if (acc + l >= target) {
+      const t = (target - acc) / l;
+      out.push({ x: points[i - 1].x + (points[i].x - points[i - 1].x) * t, y: points[i - 1].y + (points[i].y - points[i - 1].y) * t });
+      target += step;
+    } else { acc += l; i++; }
+  }
+  while (out.length < n) out.push(points[points.length - 1]);
+  return out;
+}
+const meanDist = (a, b) => a.reduce((s, p, i) => s + Math.hypot(p.x - b[i].x, p.y - b[i].y), 0) / a.length;
+const strokeLen = pts => pts.reduce((s, p, i) => i ? s + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0, 0);
+function judge(points, idx) {
+  const u = resample(points);
+  const tol = 13 + Math.min(9, REF[idx].len * 0.07);
+  const f = meanDist(u, REF[idx].pts);
+  const r = meanDist(u, [...REF[idx].pts].reverse());
+  if (f <= tol) return { ok: true };
+  if (r <= tol && r < f) return { ok: false, why: '획의 방향이 반대예요. 시작점(●)부터 써 보세요.' };
+  for (let j = idx + 1; j < REF.length; j++) {
+    const t2 = 13 + Math.min(9, REF[j].len * 0.07);
+    if (meanDist(u, REF[j].pts) <= t2) return { ok: false, why: `순서가 달라요. 그 획은 ${j + 1}번째예요. 지금은 ${idx + 1}번째 획.` };
+  }
+  return { ok: false, why: `${idx + 1}번째 획의 위치나 모양이 달라요.` };
+}
+
+// ---------------- practice cell state ----------------
+const P = { strokes: [], live: null, idx: 0, miss: 0, missHere: 0, flash: null, msg: '', msgCls: 'info', done: false, overlay: false, anim: null, recorded: false };
+function resetCell() {
+  if (P.anim) cancelAnimationFrame(P.anim.raf);
+  Object.assign(P, { strokes: [], live: null, idx: 0, miss: 0, missHere: 0, flash: null, msg: '', msgCls: 'info', done: false, overlay: false, anim: null, recorded: false });
+}
+
+let canvas, ctx, cssSize = 0;
+function colors() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  return { sheet: g('--sheet'), ink: g('--ink'), guide: g('--guide'), ghost: g('--ghost'), ai: g('--ai'), ok: g('--ok'), bad: g('--bad'), muted: g('--muted') };
+}
+function fitCanvas() {
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  cssSize = rect.width;
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.width * dpr);
+  draw();
+}
+function drawStroke(c, s, color, scale) {
+  const pts = s.pts;
+  c.strokeStyle = color; c.fillStyle = color; c.lineCap = 'round'; c.lineJoin = 'round';
+  if (pts.length === 1) { c.beginPath(); c.arc(pts[0].x * scale, pts[0].y * scale, (3.2 * scale) * (0.6 + pts[0].p * 0.8) / 2 + 1, 0, Math.PI * 2); c.fill(); return; }
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    c.lineWidth = 3.4 * scale * (0.55 + ((a.p + b.p) / 2) * 0.9);
+    c.beginPath(); c.moveTo(a.x * scale, a.y * scale); c.lineTo(b.x * scale, b.y * scale); c.stroke();
+  }
+}
+function drawRef(c, i, color, width, scale) {
+  c.save(); c.scale(scale, scale);
+  c.strokeStyle = color; c.lineWidth = width; c.lineCap = 'round'; c.lineJoin = 'round';
+  c.stroke(REF[i].path); c.restore();
+}
+function draw() {
+  if (!ctx) return;
+  const C = colors(), W = canvas.width, sc = W / N;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = C.sheet; ctx.fillRect(0, 0, W, W);
+  // 十 guide lines (dashed), like a calligraphy notebook
+  ctx.strokeStyle = C.guide; ctx.lineWidth = Math.max(1, W / 400); ctx.setLineDash([W / 70, W / 90]);
+  ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, W); ctx.moveTo(0, W / 2); ctx.lineTo(W, W / 2); ctx.stroke();
+  ctx.setLineDash([]);
+  if (!REF.length) return;
+  // template
+  if (set.mode === 'trace' || P.overlay) {
+    for (let i = 0; i < REF.length; i++) drawRef(ctx, i, C.ghost, 3.2, sc);
+    if (set.mode === 'trace') drawNumbers(C, sc);
+  }
+  // hint for the stroke being missed
+  if (set.strict && !P.done && P.missHere >= 2 && REF[P.idx]) {
+    ctx.globalAlpha = 0.45; drawRef(ctx, P.idx, C.ai, 3.6, sc); ctx.globalAlpha = 1;
+    const s = REF[P.idx].pts[0];
+    ctx.fillStyle = C.ai; ctx.beginPath(); ctx.arc(s.x * sc, s.y * sc, 2.6 * sc, 0, Math.PI * 2); ctx.fill();
+  }
+  for (const s of P.strokes) drawStroke(ctx, s, C.ink, sc);
+  if (P.flash) drawStroke(ctx, P.flash, C.bad, sc);
+  if (P.live) drawStroke(ctx, P.live, C.ink, sc);
+  // stroke-order animation layer
+  if (P.anim) {
+    const a = P.anim;
+    for (let i = 0; i < a.i && i < REF.length; i++) drawRef(ctx, i, C.ai, 3.4, sc);
+    if (a.i < REF.length) {
+      const pts = REF[a.i].pts, upto = Math.max(1, Math.floor(a.t * (pts.length - 1)));
+      ctx.strokeStyle = C.ai; ctx.lineWidth = 3.4 * sc; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(pts[0].x * sc, pts[0].y * sc);
+      for (let j = 1; j <= upto; j++) ctx.lineTo(pts[j].x * sc, pts[j].y * sc);
+      ctx.stroke();
+    }
+    drawNumbers(C, sc, a.i + 1);
+  }
+}
+function drawNumbers(C, sc, upto = REF.length) {
+  ctx.font = `600 ${4.2 * sc}px ${getComputedStyle(document.body).fontFamily}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < Math.min(upto, REF.length); i++) {
+    const p = REF[i].pts[0], q = REF[i].pts[3];
+    // nudge the number away from the stroke direction
+    const dx = p.x - q.x, dy = p.y - q.y, l = Math.hypot(dx, dy) || 1;
+    const x = (p.x + dx / l * 4.5) * sc, y = (p.y + dy / l * 4.5) * sc;
+    ctx.fillStyle = C.sheet; ctx.beginPath(); ctx.arc(x, y, 2.9 * sc, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = i < P.idx && set.strict ? C.ok : C.guide; ctx.fillText(String(i + 1), x, y + 0.2 * sc);
+  }
+}
+
+// ---------------- pen input ----------------
+function toLocal(e) {
+  const r = canvas.getBoundingClientRect();
+  const pr = e.pointerType === 'mouse' ? 0.5 : (e.pressure || 0.5);
+  return { x: (e.clientX - r.left) / r.width * N, y: (e.clientY - r.top) / r.height * N, p: Math.min(1, Math.max(0.1, pr)) };
+}
+let activeId = null;
+function bindPen() {
+  canvas.addEventListener('pointerdown', e => {
+    if (P.done || P.anim) return;
+    if (e.pointerType === 'pen') notePen();
+    if (set.penOnly && e.pointerType === 'touch') { setMsg('손가락 입력은 꺼져 있어요. 손가락으로 쓰려면 "펜으로만 쓰기"를 꺼 주세요.', 'info'); return; }
+    if (activeId !== null) return;
+    e.preventDefault();
+    activeId = e.pointerId;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    P.flash = null;
+    P.live = { pts: [toLocal(e)] };
+    draw();
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerId !== activeId || !P.live) return;
+    e.preventDefault();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of (evs.length ? evs : [e])) P.live.pts.push(toLocal(ev));
+    draw();
+  });
+  const end = e => {
+    if (e.pointerId !== activeId) return;
+    activeId = null;
+    const s = P.live; P.live = null;
+    if (!s) return;
+    if (strokeLen(s.pts) < 1.2 && s.pts.length < 3 && REF[P.idx] && REF[P.idx].len > 8) { draw(); return; } // stray tap
+    acceptStroke(s);
+  };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+}
+function acceptStroke(s) {
+  if (!set.strict) {
+    P.strokes.push(s); P.idx = P.strokes.length;
+    if (P.strokes.length >= REF.length) setMsg(`${REF.length}획을 다 썼어요. "정답 겹쳐 보기"로 비교하거나 다음 글자로 넘어가세요.`, 'info');
+    else setMsg(`${P.strokes.length} / ${REF.length}획`, 'info');
+    if (P.strokes.length === REF.length) record(false);
+    draw(); return;
+  }
+  const r = judge(s.pts, P.idx);
+  if (r.ok) {
+    P.strokes.push(s); P.idx++; P.missHere = 0;
+    if (P.idx >= REF.length) finish();
+    else setMsg(`좋아요! ${P.idx} / ${REF.length}획`, 'ok');
+  } else {
+    P.miss++; P.missHere++;
+    P.flash = s;
+    setMsg(r.why + (P.missHere >= 2 ? ' 파란 획을 참고하세요.' : ''), 'bad');
+    setTimeout(() => { if (P.flash === s) { P.flash = null; draw(); } }, 900);
+  }
+  draw();
+}
+function finish() {
+  P.done = true;
+  const perfect = P.miss === 0;
+  setMsg(perfect ? '완벽해요! 한 번도 틀리지 않았어요.' : `완성! 실수 ${P.miss}번`, 'ok');
+  record(set.mode === 'memory' && P.miss <= 1);
+  render();
+}
+function record(memorized) {
+  if (P.recorded) return;
+  P.recorded = true;
+  const k = cur().k, t = todayStr();
+  prog.cnt[k] = (prog.cnt[k] || 0) + 1;
+  prog.days[t] = (prog.days[t] || 0) + 1;
+  if (memorized) memSet.add(k);
+  save(); renderToday();
+}
+function setMsg(m, cls) { P.msg = m; P.msgCls = cls; const el = $('#status'); if (el) { el.textContent = m; el.className = 'status ' + cls; } }
+
+function animate() {
+  if (P.anim) { cancelAnimationFrame(P.anim.raf); P.anim = null; draw(); renderTools(); return; }
+  const per = 520, gap = 160;
+  const t0 = performance.now();
+  P.anim = { i: 0, t: 0, raf: 0 };
+  const step = now => {
+    const el = now - t0, slot = per + gap;
+    const i = Math.floor(el / slot);
+    if (i >= REF.length) { P.anim = null; draw(); renderTools(); return; }
+    P.anim.i = i; P.anim.t = Math.min(1, (el - i * slot) / per);
+    draw();
+    P.anim.raf = requestAnimationFrame(step);
+  };
+  P.anim.raf = requestAnimationFrame(step);
+  renderTools();
+}
+
+// ---------------- views ----------------
+let view = 'pad', listFilter = 'all';
+function modelSVG(k, numbers) {
+  const paths = k.d.map(d => `<path d="${esc(d)}" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+  let nums = '';
+  if (numbers) {
+    nums = REF.map((r, i) => {
+      const p = r.pts[0], q = r.pts[3], dx = p.x - q.x, dy = p.y - q.y, l = Math.hypot(dx, dy) || 1;
+      return `<text x="${(p.x + dx / l * 4.5).toFixed(1)}" y="${(p.y + dy / l * 4.5 + 1.5).toFixed(1)}" font-size="5" text-anchor="middle" style="fill:var(--guide)" font-weight="600">${i + 1}</text>`;
+    }).join('');
+  }
+  return `<svg viewBox="0 0 109 109" style="color:var(--ink)"><line x1="54.5" y1="0" x2="54.5" y2="109" style="stroke:var(--guide)" stroke-width=".5" stroke-dasharray="2 2"/><line x1="0" y1="54.5" x2="109" y2="54.5" style="stroke:var(--guide)" stroke-width=".5" stroke-dasharray="2 2"/>${paths}${nums}</svg>`;
+}
+function renderInfo() {
+  const k = cur();
+  const hide = set.mode === 'memory' && !P.done;
+  const mask = w => hide ? esc(w).split(esc(k.k)).join('<span style="color:var(--ai)">○</span>') : esc(w);
+  $('#info').innerHTML = `
+    <div><div class="label">${esc(k.g)} · ${REF.length}획 ${memSet.has(k.k) ? '· <span style="color:var(--ok)">외움</span>' : ''}${prog.cnt[k.k] ? ` · ${prog.cnt[k.k]}번 씀` : ''}</div>
+      <div class="mean">${esc(k.h)}</div></div>
+    <div class="model">${hide ? `<div class="hidden">외워서 써 보세요.<br>다 쓰면 정답이 보여요.</div>` : modelSVG(k, set.mode !== 'trace')}</div>
+    <dl class="rd">${k.on ? `<dt>음독</dt><dd>${esc(k.on)}</dd>` : ''}${k.kun ? `<dt>훈독</dt><dd>${esc(k.kun)}</dd>` : ''}</dl>
+    ${k.w.length ? `<div class="label">이 한자가 들어간 단어</div><div class="words">${k.w.map(w => `<div><b>${mask(w[0])}</b><span class="jp">${esc(w[1])}</span><span>${esc(w[2])}</span></div>`).join('')}</div>` : ''}`;
+}
+function renderTools() {
+  const t = $('#tools'); if (!t) return;
+  t.innerHTML = `
+    <button class="btn" id="anim">${P.anim ? '멈추기' : '획순 보기'}</button>
+    <button class="btn" id="undo" ${P.strokes.length && !P.done ? '' : 'disabled'}>한 획 지우기</button>
+    <button class="btn" id="clear">다시 쓰기</button>
+    ${set.mode !== 'trace' ? `<button class="btn" id="overlay" aria-pressed="${P.overlay}">${P.overlay ? '겹쳐 보기 끄기' : '정답 겹쳐 보기'}</button>` : ''}`;
+  $('#anim').onclick = animate;
+  $('#undo').onclick = () => { if (P.done) return; P.strokes.pop(); P.idx = set.strict ? P.strokes.length : P.strokes.length; P.missHere = 0; setMsg('', 'info'); draw(); renderTools(); };
+  $('#clear').onclick = () => { resetCell(); render(); };
+  const ov = $('#overlay'); if (ov) ov.onclick = () => { P.overlay = !P.overlay; draw(); renderTools(); };
+}
+function go(delta) {
+  const n = list().length; if (!n) return;
+  prog.idx[prog.level] = (curIdx() + delta + n) % n; save();
+  resetCell(); render();
+}
+function render() {
+  renderToday();
+  if (view === 'list') return renderList();
+  const k = cur(); if (!k) return;
+  prepRef(k);
+  const pos = curIdx() + 1, n = list().length;
+  if (!$('#cell')) {
+    $('#main').innerHTML = `
+    <div class="desk">
+      <aside class="info" id="info"></aside>
+      <section class="pad">
+        <div class="cellwrap"><canvas id="cell" aria-label="한자 쓰는 칸"></canvas><div id="banner"></div></div>
+        <div class="status info" id="status" role="status"></div>
+        <div class="tools" id="tools"></div>
+        <div class="nav"><button class="btn" id="prev">← 이전 글자</button><span class="pos" id="pos"></span><button class="btn primary" id="next">다음 글자 →</button></div>
+      </section>
+    </div>`;
+    canvas = $('#cell'); ctx = canvas.getContext('2d');
+    bindPen();
+    new ResizeObserver(() => fitCanvas()).observe(canvas);
+    $('#prev').onclick = () => go(-1);
+    $('#next').onclick = () => go(1);
+  }
+  $('#pos').textContent = `${prog.level} · ${pos} / ${n}`;
+  $('#banner').innerHTML = P.done ? `<div class="banner">${P.miss === 0 ? '완벽해요 ✓' : `완성 · 실수 ${P.miss}`}</div>` : '';
+  if (!P.msg) setMsg(set.mode === 'trace' ? '연한 글자 위에 번호 순서대로 따라 써 보세요.' : set.mode === 'look' ? '왼쪽 글자를 보면서 써 보세요.' : '뜻과 읽기만 보고 외워서 써 보세요.', 'info');
+  else setMsg(P.msg, P.msgCls);
+  renderInfo(); renderTools(); fitCanvas();
+}
+function renderList() {
+  canvas = null; ctx = null;
+  const all = list();
+  const shown = all.map((x, i) => ({ x, i })).filter(({ x }) => listFilter === 'all' || (listFilter === 'todo' ? !prog.cnt[x.k] : listFilter === 'mem' ? memSet.has(x.k) : prog.cnt[x.k] && !memSet.has(x.k)));
+  const prac = all.filter(x => prog.cnt[x.k]).length, mem = all.filter(x => memSet.has(x.k)).length;
+  $('#main').innerHTML = `
+  <section class="listpanel">
+    <div class="row" style="justify-content:space-between"><b style="font-size:18px">${prog.level} 상용한자 ${all.length}자</b><button class="btn" id="back">← 쓰기로 돌아가기</button></div>
+    <div class="seg" id="lfilter">
+      <button data-f="all" aria-pressed="${listFilter === 'all'}">전체 ${all.length}</button>
+      <button data-f="todo" aria-pressed="${listFilter === 'todo'}">안 써 본 글자 ${all.length - prac}</button>
+      <button data-f="prac" aria-pressed="${listFilter === 'prac'}">연습 중 ${prac - mem}</button>
+      <button data-f="mem" aria-pressed="${listFilter === 'mem'}">외운 글자 ${mem}</button>
+    </div>
+    <div class="legend"><span><i></i>아직</span><span><i style="border-color:var(--ai)"></i>써 봄</span><span><i style="background:var(--ai);border-color:var(--ai)"></i>외워 쓰기 성공</span></div>
+    <div class="grid">${shown.map(({ x, i }) => `<button class="${memSet.has(x.k) ? 'mem' : prog.cnt[x.k] ? 'prac' : ''}" data-i="${i}" title="${esc(x.h)}">${esc(x.k)}${prog.cnt[x.k] ? `<small>${prog.cnt[x.k]}</small>` : ''}</button>`).join('') || '<p style="color:var(--muted)">해당하는 글자가 없어요.</p>'}</div>
+  </section>`;
+  $('#back').onclick = () => { view = 'pad'; render(); };
+  $('#lfilter').onclick = e => { const b = e.target.closest('button'); if (b) { listFilter = b.dataset.f; renderList(); } };
+  $('.grid').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; prog.idx[prog.level] = +b.dataset.i; save(); view = 'pad'; resetCell(); render(); };
+}
+$('#listbtn').onclick = () => { view = view === 'list' ? 'pad' : 'list'; resetCell(); render(); };
+// Android back button (app build): leave the character list first; return false to leave the page.
+window.appBack = () => {
+  if (P.anim) { animate(); return true; }
+  if (view === 'list') { view = 'pad'; resetCell(); render(); return true; }
+  return false;
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => draw());
+new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+function boot() {
+  $('#main').innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px 0">불러오는 중…</p>';
+  canvas = null; ctx = null;
+  const lv = prog.level;
+  loadLevel(lv).then(() => { if (prog.level === lv) { resetCell(); render(); } })
+    .catch(() => { $('#main').innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px 0">글자 자료를 불러오지 못했어요. 새로고침해 주세요.</p>'; });
+}
+renderLevels(); renderModes(); boot();
+
+(async () => {
+  if (!(window.claude && window.claude.use)) return;
+  try {
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (!db || !user) return;
+    const id = await user.id(); if (!id) return;
+    const ref = db.doc('data/users/' + id + '/kanji-write');
+    const snap = await ref.get();
+    const local = plainProg();
+    const levelBefore = prog.level;
+    if (snap.exists) { prog = mergeProg(snap.data() || {}, local); memSet = new Set(prog.mem); }
+    dbRef = ref;
+    $('#sync').textContent = '연습 기록이 내 계정에 저장돼요. 태블릿과 PC에서 이어서 할 수 있어요.';
+    lsSet(LS_KEY, JSON.stringify(plainProg()));
+    if (!snap.exists || JSON.stringify(snap.data()) !== JSON.stringify(plainProg())) { dirty = true; flush(); }
+    renderLevels();
+    if (prog.level !== levelBefore) boot(); else if (view === 'list') renderList(); else renderToday();
+  } catch (e) { /* device-only storage */ }
+})();
+</script>
+
+</body></html>
