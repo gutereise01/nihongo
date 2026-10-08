@@ -1,5 +1,5 @@
 // にほんご 연습장 — 오프라인 캐시. 앱을 고치면 VERSION을 올려 주세요.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

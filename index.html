@@ -133,6 +133,27 @@ nav.tabs button[aria-selected="true"] { background: var(--ai); color: var(--ai-i
 .roma { font-family: var(--ko); font-style: italic; font-size: .78em; color: var(--ai); letter-spacing: .02em; margin-left: 6px; white-space: nowrap; }
 .roma-line { font-family: var(--ko); font-style: italic; font-size: 15px; color: var(--ai); letter-spacing: .03em; }
 .readings dd .roma { font-size: 13px; }
+.plan { display: flex; flex-direction: column; gap: 6px; }
+.days { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+.days button { border: 1px solid var(--line); border-radius: 8px; padding: 5px 0; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted);
+  background: linear-gradient(to top, var(--ai-soft) var(--p), var(--surface) var(--p)); min-width: 0; }
+.days button.part { color: var(--ai); border-color: var(--ai-soft); }
+.days button.done { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); font-weight: 600; }
+.days button[aria-pressed="true"] { background: var(--ai); border-color: var(--ai); color: var(--ai-ink); font-weight: 600; }
+.chk { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--muted); flex: none; }
+.chk[aria-pressed="true"] { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; font-weight: 600; font-family: var(--ko); }
+.items { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--line); background: var(--surface); }
+.item:first-child { border-top: 0; }
+.item .num { width: 34px; text-align: right; flex: none; }
+.item .box { width: 26px; height: 26px; border: 1.5px solid var(--muted); border-radius: 7px; display: grid; place-items: center; flex: none; background: var(--surface); padding: 0; color: var(--ai-ink); font-size: 15px; font-weight: 700; }
+.item .box[aria-checked="true"] { background: var(--ok); border-color: var(--ok); color: #fff; }
+.item .body { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.item .t { font-family: var(--jp); font-size: 17px; line-height: 1.4; overflow-wrap: anywhere; }
+.item .rd { font-size: 13px; color: var(--muted); }
+.item .m { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item.done .t { color: var(--muted); }
 .divider { width: 40%; border-top: 1px solid var(--line); margin: 6px 0; }
 .exlist { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 520px; text-align: left; margin-top: 6px; }
 .ex { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); cursor: default; }
@@ -345,7 +366,7 @@ function loadLevel(lv) {
     return fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
   };
   loading[lv] = Promise.all([get(`vocab-${lv}.json`), get(`kanji-${lv}.json`), get(`grammar-${g}.json`)])
-    .then(([vocab, kanji, grammar]) => (DATA[lv] = { vocab, kanji, grammar }))
+    .then(([vocab, kanji, grammar]) => { vocab.forEach((w, i) => { w.n = i + 1; }); kanji.forEach((x, i) => { x.n = i + 1; }); return (DATA[lv] = { vocab, kanji, grammar }); })
     .catch(e => { delete loading[lv]; throw e; });
   return loading[lv];
 }
@@ -353,8 +374,8 @@ const D = () => DATA[prog.level];
 
 // ================= Progress =================
 const LS_KEY = 'nihongo-progress-v1';
-const SETS = ['vk', 'vh', 'kk', 'kh'];   // vocab known / hard, kanji known / hard — per level
-let prog = { level: 'N4', days: [], sets: { vk: {}, vh: {}, kk: {}, kh: {} }, gs: {}, wc: {} };
+const SETS = ['vk', 'vh', 'kk', 'kh', 'vs', 'ks', 'ws'];   // + 공부함 체크 (단어·한자·작문 번호)   // vocab known / hard, kanji known / hard — per level
+let prog = { level: 'N4', days: [], sets: { vk: {}, vh: {}, kk: {}, kh: {}, vs: {}, ks: {}, ws: {} }, gs: {}, wc: {} };
 function S(m, lv = prog.level) { return prog.sets[m][lv] || (prog.sets[m][lv] = new Set()); }
 function toPlain(p = prog) {
   const o = { v: 2, level: p.level, days: p.days, gs: p.gs, wc: p.wc };
@@ -362,7 +383,7 @@ function toPlain(p = prog) {
   return o;
 }
 function fromPlain(o) {
-  const p = { level: LEVELS.includes(o && o.level) ? o.level : 'N4', days: Array.isArray(o && o.days) ? o.days : [], sets: { vk: {}, vh: {}, kk: {}, kh: {} }, gs: {}, wc: {} };
+  const p = { level: LEVELS.includes(o && o.level) ? o.level : 'N4', days: Array.isArray(o && o.days) ? o.days : [], sets: { vk: {}, vh: {}, kk: {}, kh: {}, vs: {}, ks: {}, ws: {} }, gs: {}, wc: {} };
   if (o && o.v === 2) {
     for (const m of SETS) for (const lv in (o[m] || {})) p.sets[m][lv] = new Set(o[m][lv]);
     p.gs = o.gs || {}; p.wc = o.wc || {};
@@ -452,10 +473,10 @@ document.addEventListener('keydown', e => {
   else if (tab === 'kanji' && K.mode === 'card' && $('#kcard')) { e.preventDefault(); kMove(step); }
 });
 function resetViews() {
-  Object.assign(V, { deck: null, idx: 0, flipped: false, quiz: null, search: '' });
-  Object.assign(K, { deck: null, idx: 0, flipped: false, quiz: null });
+  Object.assign(V, { deck: null, idx: 0, flipped: false, quiz: null, search: '', day: null });
+  Object.assign(K, { deck: null, idx: 0, flipped: false, quiz: null, day: null });
   Object.assign(G, { open: null, qs: null, picks: {}, mix: null, search: '' });
-  Object.assign(W, { cur: null, gid: null, result: null, err: '', showAnswer: false });
+  Object.assign(W, { day: null, cur: null, gid: null, result: null, err: '', showAnswer: false });
 }
 
 // ================= Shared quiz builder =================
@@ -481,7 +502,7 @@ function attachSwipe(el, onPrev, onNext) {
   let x0 = null, y0 = 0, dx = 0, id = null, horiz = null;
   el.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (e.target.closest('.listen')) return;
+    if (e.target.closest('.listen, .chk')) return;
     x0 = e.clientX; y0 = e.clientY; dx = 0; id = e.pointerId; horiz = null;
   });
   el.addEventListener('pointermove', e => {
@@ -512,14 +533,68 @@ function attachSwipe(el, onPrev, onNext) {
 // 다음 렌더 후 카드가 들어오는 방향 애니메이션
 function slideIn(el, dir) { if (el && dir) { el.classList.add(dir > 0 ? 'in-l' : 'in-r'); } }
 
-const V = { mode: 'card', filter: 'todo', deck: null, idx: 0, flipped: false, dir: 'jp', quiz: null, search: '' };
-function vocabPool() {
-  const list = D().vocab, k = S('vk'), h = S('vh');
-  if (V.filter === 'todo') return list.filter(w => !k.has(w.w));
-  if (V.filter === 'hard') return list.filter(w => h.has(w.w));
-  return list;
+// ================= 30일 계획 (단어·한자·작문 공통) =================
+const DAYS = 30;
+const dayRange = (n, d) => [Math.floor(n * (d - 1) / DAYS), Math.floor(n * d / DAYS)];
+const nk = x => String(x.n);
+const dayKey = kind => 'nihongo-day-' + kind + '-' + prog.level;
+function savedDay(kind) { const v = parseInt(lsGet(dayKey(kind)), 10); return v >= 0 && v <= DAYS ? v : null; }
+function rememberDay(kind, d) { lsSet(dayKey(kind), String(d)); }
+function firstOpenDay(list, set) {
+  for (let d = 1; d <= DAYS; d++) { const [a, b] = dayRange(list.length, d); for (let i = a; i < b; i++) if (!set.has(nk(list[i]))) return d; }
+  return 1;
 }
-function buildVDeck() { V.deck = shuffle(vocabPool()); V.idx = 0; V.flipped = false; V.quiz = null; }
+function sliceDay(list, d) { if (!d) return list; const [a, b] = dayRange(list.length, d); return list.slice(a, b); }
+function planHTML(id, list, set, cur, unit) {
+  let grid = '';
+  for (let d = 1; d <= DAYS; d++) {
+    const [a, b] = dayRange(list.length, d); let c = 0;
+    for (let i = a; i < b; i++) if (set.has(nk(list[i]))) c++;
+    const t = b - a, st = t && c === t ? 'done' : c ? 'part' : '';
+    grid += `<button class="${st}" data-d="${d}" aria-pressed="${cur === d}" aria-label="${d}일차 ${c}/${t}" title="${d}일차 · ${a + 1}~${b}번 · ${c}/${t}" style="--p:${t ? Math.round(c / t * 100) : 0}%">${d}</button>`;
+  }
+  const doneAll = list.filter(x => set.has(nk(x))).length;
+  return `<div class="plan" id="${id}">
+    <div class="row spread"><span class="label">30일 계획 · 하루 약 ${Math.round(list.length / DAYS)}${unit} · 전체 ${doneAll}/${list.length}</span><button class="chip" data-d="0" aria-pressed="${cur === 0}">전체 보기</button></div>
+    <div class="days">${grid}</div>
+  </div>`;
+}
+function dayMeta(cur, items, done, unit) {
+  const range = cur && items.length ? ` (${items[0].n}~${items[items.length - 1].n}번)` : '';
+  return `${cur ? cur + '일차' : '전체'}${range} · 공부한 ${unit} ${done}/${items.length}`;
+}
+function setStudied(kind, key, on) {
+  const s = S(kind + 's'); if (on === undefined) on = !s.has(key);
+  if (on) s.add(key); else s.delete(key);
+  studied(); save(); renderStats(); return on;
+}
+const chkBtn = (id, on) => `<button class="chk" id="${id}" aria-pressed="${on}">${on ? '✓ 공부함' : '공부 전 · 체크'}</button>`;
+const boxBtn = (n, on, kind) => `<button class="box" role="checkbox" aria-checked="${on}" aria-label="${n}번 공부함 표시" data-n="${n}" data-kind="${kind}">${on ? '✓' : ''}</button>`;
+function filterChips(id, F, items, set, hardSet, hardKey, unit) {
+  const done = items.filter(x => set.has(nk(x))).length;
+  const hard = hardSet ? items.filter(x => hardSet.has(hardKey(x))).length : 0;
+  return `<div class="row" id="${id}">
+      <button class="chip" data-f="left" aria-pressed="${F === 'left'}">안 한 ${unit} ${items.length - done}</button>
+      <button class="chip" data-f="done" aria-pressed="${F === 'done'}">한 ${unit} ${done}</button>
+      ${hardSet ? `<button class="chip" data-f="hard" aria-pressed="${F === 'hard'}">헷갈림 ${hard}</button>` : ''}
+      <button class="chip" data-f="all" aria-pressed="${F === 'all'}">전체 ${items.length}</button>`;
+}
+function bindPlan(id, kind, st, rebuild, render) {
+  const el = $('#' + id); if (!el) return;
+  el.onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; st.day = +b.dataset.d; rememberDay(kind, st.day); rebuild(); render(); };
+}
+
+const V = { mode: 'card', filter: 'left', deck: null, idx: 0, flipped: false, dir: 'jp', quiz: null, search: '', day: null, shuffled: false, anim: 0 };
+function vDay() { if (V.day === null) { const s = savedDay('v'); V.day = s !== null ? s : firstOpenDay(D().vocab, S('vs')); } return V.day; }
+const vDayItems = () => sliceDay(D().vocab, vDay());
+function vocabPool() {
+  const items = vDayItems(), s = S('vs'), h = S('vh');
+  if (V.filter === 'left') return items.filter(w => !s.has(nk(w)));
+  if (V.filter === 'done') return items.filter(w => s.has(nk(w)));
+  if (V.filter === 'hard') return items.filter(w => h.has(w.w));
+  return items;
+}
+function buildVDeck() { const p = vocabPool(); V.deck = V.shuffled ? shuffle(p) : p.slice(); V.idx = 0; V.flipped = false; V.quiz = null; }
 function vMove(step) {
   const n = V.idx + step;
   if (!V.deck || n < 0 || n >= V.deck.length) return false;
@@ -530,18 +605,29 @@ function vState(w) { return S('vk').has(w.w) ? '<span class="state k">외움</sp
 function exHTML(x) {
   return `<div class="ex">${listenBtn(yomi(x[0]))}<div><div class="j">${rb(x[0])}</div><div class="k">${esc(x[1])}</div></div></div>`;
 }
+function emptyDayHTML(day, filter, unit, nextId) {
+  const msg = filter === 'left' ? (day ? `${day}일차 ${unit}를 다 공부했어요! 🎉` : `모든 ${unit}를 다 공부했어요! 🎉`)
+    : filter === 'hard' ? `헷갈리는 ${unit}가 없어요` : filter === 'done' ? `아직 공부한 ${unit}가 없어요` : `${unit}가 없어요`;
+  return `<div class="card" style="cursor:default"><div class="mean">${msg}</div>
+    ${filter === 'left' && day && day < DAYS ? `<div class="row" style="justify-content:center;margin-top:8px"><button class="btn primary" id="${nextId}">${day + 1}일차로 →</button></div>` : '<div class="hint">다른 날이나 묶음을 골라 보세요.</div>'}</div>`;
+}
 function renderVocab() {
-  const d = D();
+  const d = D(), all = d.vocab, day = vDay();
   if (!V.deck) buildVDeck();
-  const total = d.vocab.length, known = d.vocab.filter(w => S('vk').has(w.w)).length, hard = d.vocab.filter(w => S('vh').has(w.w)).length;
-  const w = V.deck[V.idx];
+  const items = vDayItems(), sv = S('vs');
+  const done = items.filter(w => sv.has(nk(w))).length;
+  const known = all.filter(w => S('vk').has(w.w)).length;
+  const w = V.mode === 'list' ? null : V.deck[V.idx];
   let body = '';
   if (V.search.trim()) {
     const q = V.search.trim().toLowerCase();
-    const hits = d.vocab.filter(x => x.w.includes(q) || x.r.includes(q) || x.m.toLowerCase().includes(q)).slice(0, 40);
-    body = `<div class="exlist" style="max-width:none">${hits.length ? hits.map(x => `<div class="ex">${listenBtn(x.r)}<div><div class="j">${esc(x.w)} <span class="sub" style="display:inline">${x.r !== x.w ? esc(x.r) : ''}</span>${romaSpan(x.r || x.w)}</div><div class="k">${esc(x.m)}</div></div></div>`).join('') : '<p class="sub">찾는 단어가 없어요.</p>'}</div>`;
+    const hits = all.filter(x => x.w.includes(q) || x.r.includes(q) || x.m.toLowerCase().includes(q)).slice(0, 40);
+    body = hits.length ? `<div class="items">${hits.map(x => vItemHTML(x, sv, -1)).join('')}</div>` : '<p class="sub">찾는 단어가 없어요.</p>';
+  } else if (V.mode === 'list') {
+    const pool = vocabPool();
+    body = pool.length ? `<div class="items" id="vlist">${pool.map((x, i) => vItemHTML(x, sv, i)).join('')}</div>` : emptyDayHTML(day, V.filter, '단어', 'vnextday');
   } else if (!w) {
-    body = `<div class="card" style="cursor:default"><div class="mean">${V.filter === 'hard' ? '헷갈리는 단어가 없어요' : V.filter === 'todo' ? '이 급수 단어를 다 외웠어요!' : '단어가 없어요'}</div><div class="hint">다른 묶음을 고르거나 처음부터 다시 섞어 보세요.</div></div>`;
+    body = emptyDayHTML(day, V.filter, '단어', 'vnextday');
   } else if (V.mode === 'card') {
     const rd = w.r || w.w;
     const jpFace = w.r && w.r !== w.w
@@ -549,18 +635,18 @@ function renderVocab() {
       : `<div class="word">${esc(w.w)}</div><div class="roma-line" lang="ja-Latn">${esc(ROMA(rd))}</div>`;
     const koFace = `<div class="mean">${esc(w.m)}</div>${w.p ? `<div class="pos">${esc(w.p)}</div>` : ''}`;
     body = `<div class="card swipe" id="vcard" role="button" tabindex="0" aria-label="카드 뒤집기 (좌우로 밀어서 넘기기)">
-      <span class="tag">${prog.level}</span>${vState(w)}
+      <span class="tag"><b class="num">#${w.n}</b> · ${day ? day + '일차' : prog.level}</span>${vState(w)}
       ${V.dir === 'jp' ? jpFace : koFace}
       ${V.flipped ? `<div class="divider"></div>${V.dir === 'jp' ? koFace : jpFace}<div class="row" style="justify-content:center">${listenBtn(w.r || w.w)}</div>
         ${w.x.length ? `<div class="exlist">${w.x.map(exHTML).join('')}</div>` : ''}` : `<div class="hint">눌러서 ${V.dir === 'jp' ? '뜻' : '일본어'} 보기</div>`}
     </div>
-    <div class="swipehint">← 밀어서 다음 · 이전 → &nbsp;|&nbsp; 키보드 ← →</div>
+    <div class="row spread" style="margin-top:-6px"><span class="swipehint">← 밀어서 다음 · 이전 →</span>${chkBtn('vchk', sv.has(nk(w)))}</div>
     <div class="row"><button class="btn navb" id="vprev" aria-label="이전 단어" ${V.idx === 0 ? 'disabled' : ''}>‹</button><button class="btn big no" id="vno">헷갈려요</button><button class="btn big yes" id="vyes">알아요</button><button class="btn navb" id="vfwd" aria-label="다음 단어" ${V.idx >= V.deck.length - 1 ? 'disabled' : ''}>›</button></div>`;
   } else {
-    if (!V.quiz || V.quiz.w !== w) V.quiz = Object.assign(choiceQuiz(d.vocab, w, x => x.w, x => firstMeaning(x.m)), { w });
+    if (!V.quiz || V.quiz.w !== w) V.quiz = Object.assign(choiceQuiz(all, w, x => x.w, x => firstMeaning(x.m)), { w });
     const q = V.quiz;
     body = `<div class="qbox">
-      <div class="qprompt">${w.r && w.r !== w.w ? `<div class="yomi jp" style="color:var(--muted)">${q.picked !== null ? esc(w.r) + romaSpan(w.r) : '&nbsp;'}</div>` : ''}<div class="word">${esc(w.w)}</div>${(!w.r || w.r === w.w) && (isKata(w.w) || q.picked !== null) ? `<div class="roma-line" lang="ja-Latn">${esc(ROMA(w.r || w.w))}</div>` : ''}</div>
+      <div class="qprompt" style="position:relative"><span class="tag" style="position:absolute;top:8px;left:12px;font-size:11px;color:var(--muted)"><b class="num">#${w.n}</b></span>${w.r && w.r !== w.w ? `<div class="yomi jp" style="color:var(--muted)">${q.picked !== null ? esc(w.r) + romaSpan(w.r) : '&nbsp;'}</div>` : ''}<div class="word">${esc(w.w)}</div>${(!w.r || w.r === w.w) && (isKata(w.w) || q.picked !== null) ? `<div class="roma-line" lang="ja-Latn">${esc(ROMA(w.r || w.w))}</div>` : ''}</div>
       <div class="choices" id="vopts">${q.opts.map((o, i) => `<button class="choice ${q.picked !== null ? (i === q.ans ? 'right' : i === q.picked ? 'wrong' : '') : ''}" data-i="${i}" ${q.picked !== null ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div>
       <div class="feedback ${q.picked === null ? '' : q.picked === q.ans ? 'ok' : 'bad'}">${q.picked === null ? '뜻을 고르세요' : q.picked === q.ans ? '정답!' : '아쉬워요. 헷갈리는 단어에 넣어 둘게요.'}</div>
       ${q.picked !== null ? `${w.x.length ? `<div class="exlist" style="max-width:none">${w.x.map(exHTML).join('')}</div>` : ''}<div class="row"><button class="btn primary big" id="vnext">다음 단어</button></div>` : ''}
@@ -570,20 +656,19 @@ function renderVocab() {
   <section class="panel">
     <div class="row spread">
       <h2>${prog.level} 단어</h2>
-      <div class="seg" id="vmode"><button data-m="card" aria-pressed="${V.mode === 'card'}">카드</button><button data-m="quiz" aria-pressed="${V.mode === 'quiz'}">뜻 맞히기</button></div>
+      <div class="seg" id="vmode"><button data-m="card" aria-pressed="${V.mode === 'card'}">카드</button><button data-m="list" aria-pressed="${V.mode === 'list'}">목록</button><button data-m="quiz" aria-pressed="${V.mode === 'quiz'}">뜻 맞히기</button></div>
     </div>
-    <div class="row" id="vfilter">
-      <button class="chip" data-f="todo" aria-pressed="${V.filter === 'todo'}">외울 단어 ${total - known}</button>
-      <button class="chip" data-f="hard" aria-pressed="${V.filter === 'hard'}">헷갈리는 단어 ${hard}</button>
-      <button class="chip" data-f="all" aria-pressed="${V.filter === 'all'}">전체 ${total}</button>
+    ${planHTML('vplan', all, sv, day, '개')}
+    ${filterChips('vfilter', V.filter, items, sv, S('vh'), x => x.w, '단어')}
       ${V.mode === 'card' ? `<span style="flex:1"></span><div class="seg" id="vdir"><button data-d="jp" aria-pressed="${V.dir === 'jp'}">일→한</button><button data-d="ko" aria-pressed="${V.dir === 'ko'}">한→일</button></div>` : ''}
     </div>
-    <div><div class="meta"><span>외운 단어 ${known} / ${total}</span><span>${w && !V.search.trim() ? `${V.idx + 1} / ${V.deck.length}` : ''}</span></div><div class="bar"><i style="width:${total ? known / total * 100 : 0}%"></i></div></div>
+    <div><div class="meta"><span>${dayMeta(day, items, done, '단어')}</span><span>${w && !V.search.trim() ? `${V.idx + 1} / ${V.deck.length}` : ''}</span></div><div class="bar"><i style="width:${items.length ? done / items.length * 100 : 0}%"></i></div></div>
     ${body}
-    <div class="row spread"><input class="search" id="vsearch" type="search" placeholder="단어 찾기 (일본어, 읽기, 뜻)" value="${esc(V.search)}" style="flex:1;min-width:0"><button class="btn ghost" id="vshuf">다시 섞기</button></div>
+    <div class="row spread"><input class="search" id="vsearch" type="search" placeholder="단어 찾기 (일본어, 읽기, 뜻)" value="${esc(V.search)}" style="flex:1;min-width:0"><button class="btn ghost" id="vshuf">${V.shuffled ? '번호순으로' : '섞기'}</button></div>
+    <p class="sub">외운 단어(알아요) ${known} / ${all.length}</p>
   </section>`;
   const c = $('#vcard');
-  if (c) {
+  if (c && w) {
     const flip = () => { V.flipped = !V.flipped; renderVocab(); if (V.flipped) say(w.r || w.w); };
     c.onclick = e => { if (!e.target.closest('.ex')) flip(); };
     c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } };
@@ -593,27 +678,41 @@ function renderVocab() {
     if (pv) pv.onclick = () => { vMove(-1); }; if (fw) fw.onclick = () => { vMove(1); };
   }
   V.anim = 0;
-  $('#vmode').onclick = e => { const b = e.target.closest('button'); if (b) { V.mode = b.dataset.m; V.flipped = false; V.quiz = null; renderVocab(); } };
+  bindPlan('vplan', 'v', V, buildVDeck, renderVocab);
+  $('#vmode').onclick = e => { const b = e.target.closest('button'); if (b) { V.mode = b.dataset.m; V.flipped = false; V.quiz = null; if (V.mode !== 'list') buildVDeck(); renderVocab(); } };
   $('#vfilter').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { V.filter = b.dataset.f; buildVDeck(); renderVocab(); } };
   const dir = $('#vdir'); if (dir) dir.onclick = e => { const b = e.target.closest('button'); if (b) { V.dir = b.dataset.d; V.flipped = false; renderVocab(); } };
-  $('#vshuf').onclick = () => { V.search = ''; buildVDeck(); renderVocab(); };
+  $('#vshuf').onclick = () => { V.search = ''; V.shuffled = !V.shuffled; buildVDeck(); renderVocab(); };
+  const nd = $('#vnextday'); if (nd) nd.onclick = () => { V.day = day + 1; rememberDay('v', V.day); buildVDeck(); renderVocab(); window.scrollTo({ top: 0 }); };
   const s = $('#vsearch');
   s.oninput = () => { V.search = s.value; const pos = s.selectionStart; renderVocab(); const n = $('#vsearch'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} };
+  const lst = $('#main .items');
+  if (lst) lst.onclick = e => {
+    const bx = e.target.closest('.box');
+    if (bx) { setStudied('v', bx.dataset.n); renderVocab(); return; }
+    const it = e.target.closest('.body[data-i]');
+    if (it && +it.dataset.i >= 0) { V.deck = vocabPool(); V.idx = +it.dataset.i; V.mode = 'card'; V.flipped = false; V.quiz = null; renderVocab(); window.scrollTo({ top: 0 }); }
+  };
   if (w && !V.search.trim()) {
     const yes = $('#vyes'), no = $('#vno');
     if (yes) yes.onclick = () => markV(w, true);
     if (no) no.onclick = () => markV(w, false);
+    const ck = $('#vchk'); if (ck) ck.onclick = () => { setStudied('v', nk(w)); renderVocab(); };
     const opts = $('#vopts');
     if (opts) opts.onclick = e => {
       const b = e.target.closest('.choice'); if (!b || V.quiz.picked !== null) return;
       V.quiz.picked = +b.dataset.i;
-      const ok = V.quiz.picked === V.quiz.ans;
-      setKnown('v', w.w, ok);
+      setKnown('v', w.w, V.quiz.picked === V.quiz.ans);
+      setStudied('v', nk(w), true);
       say(w.r || w.w);
       renderVocab();
     };
     const nx = $('#vnext'); if (nx) nx.onclick = () => { V.idx++; V.quiz = null; renderVocab(); };
   }
+}
+function vItemHTML(x, sv, i) {
+  const on = sv.has(nk(x));
+  return `<div class="item ${on ? 'done' : ''}">${boxBtn(x.n, on, 'v')}<span class="num">${x.n}</span><button class="body" data-i="${i}"><span class="t">${esc(x.w)}${x.r && x.r !== x.w ? ` <span class="rd">${esc(x.r)}</span>` : ''}${romaSpan(x.r || x.w)}</span><span class="m">${esc(firstMeaning(x.m))}</span></button>${listenBtn(x.r || x.w)}</div>`;
 }
 function setKnown(kind, key, ok) {
   const k = S(kind + 'k'), h = S(kind + 'h');
@@ -622,20 +721,24 @@ function setKnown(kind, key, ok) {
 }
 function markV(w, ok) {
   setKnown('v', w.w, ok);
+  setStudied('v', nk(w), true);
   if (!ok) V.deck.splice(Math.min(V.deck.length, V.idx + 6 + Math.floor(Math.random() * 6)), 0, w); // see it again soon
   V.idx++; V.flipped = false; V.anim = 1;
   renderVocab();
 }
 
 // ================= Kanji =================
-const K = { mode: 'card', filter: 'todo', deck: null, idx: 0, flipped: false, quiz: null };
+const K = { mode: 'card', filter: 'left', deck: null, idx: 0, flipped: false, quiz: null, day: null, shuffled: false, anim: 0 };
+function kDay() { if (K.day === null) { const s = savedDay('k'); K.day = s !== null ? s : firstOpenDay(D().kanji, S('ks')); } return K.day; }
+const kDayItems = () => sliceDay(D().kanji, kDay());
 function kanjiPool() {
-  const list = D().kanji, k = S('kk'), h = S('kh');
-  if (K.filter === 'todo') return list.filter(x => !k.has(x.k));
-  if (K.filter === 'hard') return list.filter(x => h.has(x.k));
-  return list;
+  const items = kDayItems(), s = S('ks'), h = S('kh');
+  if (K.filter === 'left') return items.filter(x => !s.has(nk(x)));
+  if (K.filter === 'done') return items.filter(x => s.has(nk(x)));
+  if (K.filter === 'hard') return items.filter(x => h.has(x.k));
+  return items;
 }
-function buildKDeck() { K.deck = shuffle(kanjiPool()); K.idx = 0; K.flipped = false; K.quiz = null; }
+function buildKDeck() { const p = kanjiPool(); K.deck = K.shuffled ? shuffle(p) : p.slice(); K.idx = 0; K.flipped = false; K.quiz = null; }
 function kMove(step) {
   const n = K.idx + step;
   if (!K.deck || n < 0 || n >= K.deck.length) return false;
@@ -656,26 +759,35 @@ function kanjiBack(x) {
     <dl class="readings">${x.on ? `<dt>음독</dt><dd>${esc(x.on)}${romaSpan(x.on)}</dd>` : ''}${x.kun ? `<dt>훈독</dt><dd>${esc(x.kun)}${romaSpan(x.kun)}</dd>` : ''}<dt>획수</dt><dd style="font-family:var(--ko);font-size:14px">${esc(x.s)} · ${esc(x.g)}</dd></dl>
     ${rel.length ? `<div class="related">${rel.map(w => `<span><b class="jp">${esc(w.w)}</b>${isKata(w.w) ? romaSpan(w.w) : ''} ${esc(firstMeaning(w.m))}</span>`).join('')}</div>` : ''}`;
 }
+function kItemHTML(x, ss, i) {
+  const on = ss.has(nk(x));
+  return `<div class="item ${on ? 'done' : ''}">${boxBtn(x.n, on, 'k')}<span class="num">${x.n}</span><button class="body" data-i="${i}"><span class="t"><b style="font-size:22px">${esc(x.k)}</b> <span class="rd">${esc(x.on || x.kun || '')}</span></span><span class="m">${esc(x.h)}</span></button></div>`;
+}
 function renderKanji() {
-  const d = D();
+  const d = D(), all = d.kanji, day = kDay();
   if (!K.deck) buildKDeck();
-  const total = d.kanji.length, known = d.kanji.filter(x => S('kk').has(x.k)).length, hard = d.kanji.filter(x => S('kh').has(x.k)).length;
-  const x = K.deck[K.idx];
+  const items = kDayItems(), ss = S('ks');
+  const done = items.filter(x => ss.has(nk(x))).length;
+  const known = all.filter(x => S('kk').has(x.k)).length;
+  const x = K.mode === 'list' ? null : K.deck[K.idx];
   const st = x ? (S('kk').has(x.k) ? '<span class="state k">외움</span>' : S('kh').has(x.k) ? '<span class="state h">헷갈림</span>' : '') : '';
   let body;
-  if (!x) body = `<div class="card" style="cursor:default"><div class="mean">${K.filter === 'hard' ? '헷갈리는 한자가 없어요' : '이 급수 한자를 다 외웠어요!'}</div><div class="hint">다른 묶음을 골라 보세요.</div></div>`;
+  if (K.mode === 'list') {
+    const pool = kanjiPool();
+    body = pool.length ? `<div class="items" id="klist">${pool.map((y, i) => kItemHTML(y, ss, i)).join('')}</div>` : emptyDayHTML(day, K.filter, '한자', 'knextday');
+  } else if (!x) body = emptyDayHTML(day, K.filter, '한자', 'knextday');
   else if (K.mode === 'card') {
-    body = `<div class="card swipe" id="kcard" role="button" tabindex="0" aria-label="카드 뒤집기 (좌우로 밀어서 넘기기)"><span class="tag">${esc(x.g)}</span>${st}
+    body = `<div class="card swipe" id="kcard" role="button" tabindex="0" aria-label="카드 뒤집기 (좌우로 밀어서 넘기기)"><span class="tag"><b class="num">#${x.n}</b> · ${day ? day + '일차' : esc(x.g)}</span>${st}
       <div class="kanji">${esc(x.k)}</div>
       ${K.flipped ? `<div class="divider"></div>${kanjiBack(x)}` : '<div class="hint">눌러서 뜻과 읽기 보기</div>'}
     </div>
-    <div class="swipehint">← 밀어서 다음 · 이전 → &nbsp;|&nbsp; 키보드 ← →</div>
+    <div class="row spread" style="margin-top:-6px"><span class="swipehint">← 밀어서 다음 · 이전 →</span>${chkBtn('kchk', ss.has(nk(x)))}</div>
     <div class="row"><button class="btn navb" id="kprev" aria-label="이전 한자" ${K.idx === 0 ? 'disabled' : ''}>‹</button><button class="btn big no" id="kno">헷갈려요</button><button class="btn big yes" id="kyes">알아요</button><button class="btn navb" id="kfwd" aria-label="다음 한자" ${K.idx >= K.deck.length - 1 ? 'disabled' : ''}>›</button></div>`;
   } else {
-    if (!K.quiz || K.quiz.x !== x) K.quiz = Object.assign(choiceQuiz(d.kanji, x, y => y.k, y => y.h), { x });
+    if (!K.quiz || K.quiz.x !== x) K.quiz = Object.assign(choiceQuiz(all, x, y => y.k, y => y.h), { x });
     const q = K.quiz;
     body = `<div class="qbox">
-      <div class="qprompt"><div class="kanji">${esc(x.k)}</div></div>
+      <div class="qprompt" style="position:relative"><span style="position:absolute;top:8px;left:12px;font-size:11px;color:var(--muted)"><b class="num">#${x.n}</b></span><div class="kanji">${esc(x.k)}</div></div>
       <div class="choices" id="kopts">${q.opts.map((o, i) => `<button class="choice ${q.picked !== null ? (i === q.ans ? 'right' : i === q.picked ? 'wrong' : '') : ''}" data-i="${i}" ${q.picked !== null ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div>
       <div class="feedback ${q.picked === null ? '' : q.picked === q.ans ? 'ok' : 'bad'}">${q.picked === null ? '훈음(뜻과 음)을 고르세요' : q.picked === q.ans ? '정답!' : '아쉬워요.'}</div>
       ${q.picked !== null ? `<div class="card" style="cursor:default;min-height:0">${kanjiBack(x)}</div><div class="row"><button class="btn primary big" id="knext">다음 한자</button></div>` : ''}
@@ -685,19 +797,19 @@ function renderKanji() {
   <section class="panel">
     <div class="row spread">
       <h2>${prog.level} 한자</h2>
-      <div class="seg" id="kmode"><button data-m="card" aria-pressed="${K.mode === 'card'}">카드</button><button data-m="quiz" aria-pressed="${K.mode === 'quiz'}">훈음 맞히기</button></div>
+      <div class="seg" id="kmode"><button data-m="card" aria-pressed="${K.mode === 'card'}">카드</button><button data-m="list" aria-pressed="${K.mode === 'list'}">목록</button><button data-m="quiz" aria-pressed="${K.mode === 'quiz'}">훈음 맞히기</button></div>
     </div>
     <p class="sub">한검 급수 기준으로 나눴어요 (N5 10·9급 → N1 준2·2급).</p>
-    <div class="row" id="kfilter">
-      <button class="chip" data-f="todo" aria-pressed="${K.filter === 'todo'}">외울 한자 ${total - known}</button>
-      <button class="chip" data-f="hard" aria-pressed="${K.filter === 'hard'}">헷갈리는 한자 ${hard}</button>
-      <button class="chip" data-f="all" aria-pressed="${K.filter === 'all'}">전체 ${total}</button>
+    ${planHTML('kplan', all, ss, day, '자')}
+    ${filterChips('kfilter', K.filter, items, ss, S('kh'), y => y.k, '한자')}
+      <span style="flex:1"></span><button class="btn ghost" id="kshuf">${K.shuffled ? '번호순으로' : '섞기'}</button>
     </div>
-    <div><div class="meta"><span>외운 한자 ${known} / ${total}</span><span>${x ? `${K.idx + 1} / ${K.deck.length}` : ''}</span></div><div class="bar"><i style="width:${total ? known / total * 100 : 0}%"></i></div></div>
+    <div><div class="meta"><span>${dayMeta(day, items, done, '한자')}</span><span>${x ? `${K.idx + 1} / ${K.deck.length}` : ''}</span></div><div class="bar"><i style="width:${items.length ? done / items.length * 100 : 0}%"></i></div></div>
     ${body}
+    <p class="sub">외운 한자(알아요) ${known} / ${all.length}</p>
   </section>`;
   const c = $('#kcard');
-  if (c) {
+  if (c && x) {
     const flip = () => { K.flipped = !K.flipped; renderKanji(); };
     c.onclick = flip; c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } };
     attachSwipe(c, () => kMove(-1), () => kMove(1));
@@ -706,15 +818,26 @@ function renderKanji() {
     if (pv) pv.onclick = () => { kMove(-1); }; if (fw) fw.onclick = () => { kMove(1); };
   }
   K.anim = 0;
-  $('#kmode').onclick = e => { const b = e.target.closest('button'); if (b) { K.mode = b.dataset.m; K.flipped = false; K.quiz = null; renderKanji(); } };
+  bindPlan('kplan', 'k', K, buildKDeck, renderKanji);
+  $('#kmode').onclick = e => { const b = e.target.closest('button'); if (b) { K.mode = b.dataset.m; K.flipped = false; K.quiz = null; if (K.mode !== 'list') buildKDeck(); renderKanji(); } };
   $('#kfilter').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { K.filter = b.dataset.f; buildKDeck(); renderKanji(); } };
+  $('#kshuf').onclick = () => { K.shuffled = !K.shuffled; buildKDeck(); renderKanji(); };
+  const nd = $('#knextday'); if (nd) nd.onclick = () => { K.day = day + 1; rememberDay('k', K.day); buildKDeck(); renderKanji(); window.scrollTo({ top: 0 }); };
+  const lst = $('#klist');
+  if (lst) lst.onclick = e => {
+    const bx = e.target.closest('.box');
+    if (bx) { setStudied('k', bx.dataset.n); renderKanji(); return; }
+    const it = e.target.closest('.body[data-i]');
+    if (it) { K.deck = kanjiPool(); K.idx = +it.dataset.i; K.mode = 'card'; K.flipped = false; K.quiz = null; renderKanji(); window.scrollTo({ top: 0 }); }
+  };
   if (x) {
     const yes = $('#kyes'), no = $('#kno');
-    const mark = ok => { setKnown('k', x.k, ok); if (!ok) K.deck.splice(Math.min(K.deck.length, K.idx + 6), 0, x); K.idx++; K.flipped = false; K.anim = 1; renderKanji(); };
+    const mark = ok => { setKnown('k', x.k, ok); setStudied('k', nk(x), true); if (!ok) K.deck.splice(Math.min(K.deck.length, K.idx + 6), 0, x); K.idx++; K.flipped = false; K.anim = 1; renderKanji(); };
     if (yes) yes.onclick = () => mark(true);
     if (no) no.onclick = () => mark(false);
+    const ck = $('#kchk'); if (ck) ck.onclick = () => { setStudied('k', nk(x)); renderKanji(); };
     const opts = $('#kopts');
-    if (opts) opts.onclick = e => { const b = e.target.closest('.choice'); if (!b || K.quiz.picked !== null) return; K.quiz.picked = +b.dataset.i; setKnown('k', x.k, K.quiz.picked === K.quiz.ans); renderKanji(); };
+    if (opts) opts.onclick = e => { const b = e.target.closest('.choice'); if (!b || K.quiz.picked !== null) return; K.quiz.picked = +b.dataset.i; setKnown('k', x.k, K.quiz.picked === K.quiz.ans); setStudied('k', nk(x), true); renderKanji(); };
     const nx = $('#knext'); if (nx) nx.onclick = () => { K.idx++; K.quiz = null; renderKanji(); };
   }
 }
@@ -852,7 +975,7 @@ function renderMix(list) {
 const samplePromise = (window.claude && window.claude.use) ? window.claude.use('sample').catch(() => null) : Promise.resolve(null);
 let sampleFn, aiOff = false;
 samplePromise.then(s => { sampleFn = s; if (!s) { aiOff = true; if (tab === 'write' && D()) renderWrite(); } });
-const W = { mode: 'prompt', cur: null, gid: null, topic: 0, drafts: {}, result: null, showAnswer: false, busy: false, ctl: null, err: '' };
+const W = { mode: 'prompt', filter: 'left', day: null, cur: null, gid: null, topic: 0, drafts: {}, result: null, showAnswer: false, busy: false, ctl: null, err: '' };
 const VERDICT = { perfect: '완벽해요', good: '뜻은 통해요, 조금 다듬기', fix: '고쳐 볼까요' };
 const ERR = {
   not_granted: 'AI 사용이 허용되지 않았어요. 모범 답안과 비교해 보세요.',
@@ -862,59 +985,116 @@ const ERR = {
   invalid_json: '답을 읽지 못했어요. 한 번 더 눌러 주세요.',
   refused: '이 문장은 첨삭할 수 없어요. 문장을 바꿔서 다시 시도해 주세요.'
 };
-function nextPrompt() {
-  const list = D().grammar;
-  const src = W.gid ? list.filter(g => g.id === W.gid) : list;
-  const cands = [];
-  for (const g of src) {
-    for (const e of g.x) if (plain(e[0]).length <= 45) cands.push({ g, jp: e[0], ko: e[1] });
-    for (const e of (g.wx || [])) if (e[0].length <= 45) cands.push({ g, jp: e[0], ko: e[1] });
+// 작문 문장 목록: 문법 예문을 순서대로 번호 매김 (급수마다 고정)
+function wList() {
+  const d = D(); if (d.wlist) return d.wlist;
+  const out = [], seen = new Set();
+  for (const g of d.grammar) {
+    for (const e of g.x) { const p = plain(e[0]); if (p.length <= 45 && !seen.has(p)) { seen.add(p); out.push({ g, jp: e[0], ko: e[1] }); } }
+    for (const e of (g.wx || [])) { if (e[0].length <= 45 && !seen.has(e[0])) { seen.add(e[0]); out.push({ g, jp: e[0], ko: e[1] }); } }
   }
-  const prev = W.cur && W.cur.jp;
-  const pool = cands.filter(c => c.jp !== prev);
-  W.cur = (pool.length ? pick(pool) : cands[0]) || null;
+  out.forEach((c, i) => { c.n = i + 1; });
+  return (d.wlist = out);
+}
+function wDay() { if (W.day === null) { const s = savedDay('w'); W.day = s !== null ? s : firstOpenDay(wList(), S('ws')); } return W.day; }
+const wDayItems = () => sliceDay(wList(), wDay());
+function wPool() {
+  const items = wDayItems(), s = S('ws');
+  if (W.filter === 'left') return items.filter(c => !s.has(nk(c)));
+  if (W.filter === 'done') return items.filter(c => s.has(nk(c)));
+  return items;
+}
+function nextPrompt(step = 1) {
   W.result = null; W.err = ''; W.showAnswer = false;
-  if (!W.cur && W.gid) { W.gid = null; nextPrompt(); }
+  if (W.gid) {   // 문법 탭에서 '이 문법으로 작문하기'로 들어온 경우
+    const cands = wList().filter(c => c.g.id === W.gid);
+    const pool = cands.filter(c => c !== W.cur);
+    W.cur = (pool.length ? pick(pool) : cands[0]) || null;
+    if (!W.cur) { W.gid = null; nextPrompt(); }
+    return;
+  }
+  const items = wDayItems(); if (!items.length) { W.cur = null; return; }
+  const s = S('ws'), len = items.length, i = W.cur ? items.indexOf(W.cur) : -1;
+  if (step < 0) { W.cur = items[((i < 0 ? 0 : i) - 1 + len) % len]; return; }
+  for (let k = 1; k <= len; k++) { const c = items[(i + k + len) % len]; if (!s.has(nk(c))) { W.cur = c; return; } }
+  W.cur = items[(i + 1 + len) % len];
 }
 const draftKey = () => W.mode === 'prompt' ? 'p:' + (W.cur ? W.cur.jp : '') : 'f:' + prog.level + W.topic;
 function renderWrite() {
-  if (W.mode === 'prompt' && !W.cur) nextPrompt();
-  const c = W.cur, lv = prog.level, topics = TOPICS[lv];
-  const draft = W.drafts[draftKey()] || '';
+  const lv = prog.level, topics = TOPICS[lv], list = wList(), ws = S('ws');
+  const planned = W.mode !== 'free';
+  const day = planned ? wDay() : 0;
+  if (W.mode === 'prompt' && (!W.cur || (!W.gid && !wDayItems().includes(W.cur)))) { W.cur = null; nextPrompt(); }
+  const c = W.cur;
+  const items = planned ? wDayItems() : [], done = items.filter(x => ws.has(nk(x))).length;
   const wc = prog.wc[lv] || { n: 0, perfect: 0 };
   const focus = W.gid && D().grammar.find(g => g.id === W.gid);
+  const head = `
+    <div class="row spread">
+      <h2>${lv} 작문</h2>
+      <div class="seg" id="wmode"><button data-m="prompt" aria-pressed="${W.mode === 'prompt'}">문장 번역</button><button data-m="list" aria-pressed="${W.mode === 'list'}">목록</button><button data-m="free" aria-pressed="${W.mode === 'free'}">자유 작문</button></div>
+    </div>
+    ${planned ? `${planHTML('wplan', list, ws, day, '문장')}
+    ${filterChips('wfilter', W.filter, items, ws, null, null, '문장')}</div>
+    <div><div class="meta"><span>${dayMeta(day, items, done, '문장')}</span><span>첨삭 ${wc.n}회 (완벽 ${wc.perfect})</span></div><div class="bar"><i style="width:${items.length ? done / items.length * 100 : 0}%"></i></div></div>` : ''}`;
+
+  if (W.mode === 'list') {
+    const pool = wPool();
+    $('#main').innerHTML = `<section class="panel">${head}
+      ${pool.length ? `<div class="items" id="wlist">${pool.map(x => {
+        const on = ws.has(nk(x));
+        return `<div class="item ${on ? 'done' : ''}">${boxBtn(x.n, on, 'w')}<span class="num">${x.n}</span><button class="body" data-n="${x.n}"><span class="t" style="font-family:var(--ko);font-size:15px">${esc(x.ko)}</span><span class="m">${esc(x.g.p)}</span></button></div>`;
+      }).join('')}</div>` : `<div class="card" style="cursor:default"><div class="mean">${W.filter === 'left' ? `${day ? day + '일차 ' : ''}문장을 다 공부했어요! 🎉` : '문장이 없어요'}</div>${W.filter === 'left' && day && day < DAYS ? `<div class="row" style="justify-content:center;margin-top:8px"><button class="btn primary" id="wnextday">${day + 1}일차로 →</button></div>` : ''}</div>`}
+    </section>`;
+    bindWriteCommon(day);
+    $('#wlist') && ($('#wlist').onclick = e => {
+      const bx = e.target.closest('.box');
+      if (bx) { setStudied('w', bx.dataset.n); renderWrite(); return; }
+      const it = e.target.closest('.body[data-n]');
+      if (it) { W.cur = list[+it.dataset.n - 1]; W.gid = null; W.mode = 'prompt'; W.result = null; W.err = ''; W.showAnswer = false; renderWrite(); window.scrollTo({ top: 0 }); }
+    });
+    return;
+  }
+
+  const draft = W.drafts[draftKey()] || '';
   const task = W.mode === 'prompt' && c
-    ? `<div><div class="label">이 문장을 일본어로 써 보세요</div><p class="prompt-ko">${esc(c.ko)}</p>
+    ? `<div><div class="row spread"><span class="label"><b class="num">#${c.n}</b> · 이 문장을 일본어로 써 보세요</span>${chkBtn('wchk', ws.has(nk(c)))}</div><p class="prompt-ko">${esc(c.ko)}</p>
         <p class="sub">힌트 문법: <b class="jp" style="color:var(--ink)">${esc(c.g.p)}</b> — ${esc(c.g.wm || c.g.m)}</p></div>`
+    : W.mode === 'prompt' ? `<div class="card" style="cursor:default;min-height:120px"><div class="mean">이 묶음에 문장이 없어요</div><div class="hint">다른 날이나 묶음을 골라 보세요.</div></div>`
     : `<div><div class="label">주제를 골라 자유롭게 써 보세요</div><div class="row" id="wtopics" style="margin-top:6px">${topics.map((t, i) => `<button class="chip" data-t="${i}" aria-pressed="${W.topic === i}">${esc(t)}</button>`).join('')}</div></div>`;
   $('#main').innerHTML = `
   <section class="panel">
-    <div class="row spread">
-      <h2>${lv} 작문</h2>
-      <div class="seg" id="wmode"><button data-m="prompt" aria-pressed="${W.mode === 'prompt'}">문장 번역</button><button data-m="free" aria-pressed="${W.mode === 'free'}">자유 작문</button></div>
-    </div>
-    ${W.mode === 'prompt' ? `<div class="row spread"><span class="sub">문법 예문 ${D().grammar.reduce((n, g) => n + g.x.length + (g.wx || []).length, 0)}개에서 출제 · 첨삭 ${wc.n}회 (완벽 ${wc.perfect})</span>${focus ? `<button class="chip" id="wclear" aria-pressed="true">${esc(focus.p)}만 ✕</button>` : ''}</div>` : ''}
+    ${head}
+    ${W.mode === 'prompt' && focus ? `<div class="row"><button class="chip" id="wclear" aria-pressed="true">${esc(focus.p)}만 연습 중 ✕</button></div>` : ''}
     ${task}
-    <textarea id="wtext" class="genko" lang="ja" spellcheck="false" placeholder="여기에 일본어로 써 보세요. 일본어 자판이 없으면 로마자도 괜찮아요.">${esc(draft)}</textarea>
+    ${W.mode === 'free' || c ? `<textarea id="wtext" class="genko" lang="ja" spellcheck="false" placeholder="여기에 일본어로 써 보세요. 일본어 자판이 없으면 로마자도 괜찮아요.">${esc(draft)}</textarea>
     <div class="row">
       ${aiOff ? '' : `<button class="btn primary" id="wcheck" ${W.busy ? 'disabled' : ''}>AI 선생님께 첨삭받기</button>`}
       ${W.busy ? '<button class="btn" id="wstop">그만</button>' : ''}
-      ${W.mode === 'prompt' ? `<button class="btn" id="wans">${W.showAnswer ? '모범 답안 숨기기' : '모범 답안 보기'}</button><button class="btn ghost" id="wnext">다음 문장 →</button>` : ''}
+      ${W.mode === 'prompt' ? `<button class="btn" id="wans">${W.showAnswer ? '모범 답안 숨기기' : '모범 답안 보기'}</button><span style="flex:1"></span><button class="btn ghost" id="wprev">← 이전</button><button class="btn ghost" id="wnext">다음 문장 →</button>` : ''}
     </div>
-    ${aiOff ? '<p class="note">AI 첨삭은 이 앱에서는 쓸 수 없어요. 모범 답안과 비교해 보세요.</p>' : ''}
+    ${aiOff ? '<p class="note">AI 첨삭은 이 앱에서는 쓸 수 없어요. 모범 답안과 비교해 보세요. 모범 답안을 보면 공부함으로 체크돼요.</p>' : ''}` : ''}
     ${W.mode === 'prompt' && W.showAnswer && c ? `<div class="result"><div class="label">모범 답안 (자료 예문)</div><div class="ex" style="background:transparent;border:0;padding:0">${listenBtn(yomi(c.jp))}<div><p class="corrected">${rb(c.jp)}</p></div></div><p class="note">다른 표현도 정답일 수 있어요.</p></div>` : ''}
     <div id="wout"></div>
   </section>`;
+  bindWriteCommon(day);
   const ta = $('#wtext');
-  ta.oninput = () => { W.drafts[draftKey()] = ta.value; };
-  $('#wmode').onclick = e => { const b = e.target.closest('button'); if (b && !W.busy) { W.mode = b.dataset.m; W.result = null; W.err = ''; W.showAnswer = false; renderWrite(); } };
+  if (ta) ta.oninput = () => { W.drafts[draftKey()] = ta.value; };
   const tp = $('#wtopics'); if (tp) tp.onclick = e => { const b = e.target.closest('button'); if (b && !W.busy) { W.topic = +b.dataset.t; W.result = null; W.err = ''; renderWrite(); } };
-  const cl = $('#wclear'); if (cl) cl.onclick = () => { if (W.busy) return; W.gid = null; nextPrompt(); renderWrite(); };
+  const cl = $('#wclear'); if (cl) cl.onclick = () => { if (W.busy) return; W.gid = null; W.cur = null; nextPrompt(); renderWrite(); };
   const ck = $('#wcheck'); if (ck) ck.onclick = checkWriting;
   const st = $('#wstop'); if (st) st.onclick = () => W.ctl && W.ctl.abort();
-  const an = $('#wans'); if (an) an.onclick = () => { W.showAnswer = !W.showAnswer; renderWrite(); };
-  const nx = $('#wnext'); if (nx) nx.onclick = () => { if (W.busy) return; nextPrompt(); renderWrite(); };
+  const an = $('#wans'); if (an) an.onclick = () => { W.showAnswer = !W.showAnswer; if (W.showAnswer && c) setStudied('w', nk(c), true); renderWrite(); };
+  const wk = $('#wchk'); if (wk && c) wk.onclick = () => { setStudied('w', nk(c)); renderWrite(); };
+  const nx = $('#wnext'); if (nx) nx.onclick = () => { if (W.busy) return; nextPrompt(1); renderWrite(); };
+  const pv = $('#wprev'); if (pv) pv.onclick = () => { if (W.busy) return; nextPrompt(-1); renderWrite(); };
   renderResult();
+}
+function bindWriteCommon(day) {
+  $('#wmode').onclick = e => { const b = e.target.closest('button'); if (b && !W.busy) { W.mode = b.dataset.m; W.result = null; W.err = ''; W.showAnswer = false; renderWrite(); } };
+  const pl = $('#wplan'); if (pl) pl.onclick = e => { const b = e.target.closest('[data-d]'); if (!b || W.busy) return; W.day = +b.dataset.d; rememberDay('w', W.day); W.gid = null; W.cur = null; renderWrite(); };
+  const fl = $('#wfilter'); if (fl) fl.onclick = e => { const b = e.target.closest('[data-f]'); if (b) { W.filter = b.dataset.f; renderWrite(); } };
+  const nd = $('#wnextday'); if (nd) nd.onclick = () => { W.day = day + 1; rememberDay('w', W.day); W.cur = null; renderWrite(); window.scrollTo({ top: 0 }); };
 }
 function renderResult() {
   const out = $('#wout'); if (!out) return;
@@ -981,6 +1161,7 @@ perfect = 고칠 곳 없음(points는 빈 배열), good = 뜻은 통하지만 �
     else {
       const wc = prog.wc[lv] || (prog.wc[lv] = { n: 0, perfect: 0 });
       wc.n++; if (r.verdict === 'perfect') wc.perfect++;
+      if (W.mode === 'prompt' && c && c.n) S('ws').add(nk(c));
       studied(); save(); renderStats();
     }
   } catch (e) {
