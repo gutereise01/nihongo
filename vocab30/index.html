@@ -157,79 +157,83 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
 .peek-ko{font-size:18px;font-weight:700;color:var(--omr)}
 .peek-def{margin:0;font-size:14px;color:var(--muted)}
 .vsel{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sheet);color:var(--ink);font:inherit;font-size:15px}
+/* home: collapsible day + inline card */
+.homewrap{display:flex;flex-direction:column;gap:12px}
+.daybar{display:flex;gap:8px;align-items:stretch}
+.daytoggle{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);background:var(--sheet);border-radius:14px;padding:10px 14px;text-align:left}
+.daytoggle .dl{display:flex;flex-direction:column;min-width:0}
+.daytoggle .dl b{font-size:17px}
+.daytoggle .dl small{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.daytoggle .chev{font-size:13px;color:var(--omr);font-weight:600;white-space:nowrap}
+.listbtn{border:1px solid var(--omr);background:var(--sheet);color:var(--omr);border-radius:14px;padding:0 14px;font-weight:600;font-size:14px;white-space:nowrap}
+.bar.thin{height:4px}
+.omr-foot{margin:12px 4px 0;font-size:12px;color:var(--muted)}
+.day.cur .bub::before{box-shadow:0 0 0 3px var(--omr-soft)}
+.day.cur small{color:var(--omr);font-weight:700}
+.homewrap .stack{height:calc(100vh - 330px);min-height:400px;max-height:600px}
+.navbtns{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}
+.navb{border:1px solid var(--line);background:var(--sheet);border-radius:14px;padding:13px 6px;font-weight:600;color:var(--ink)}
+.navb:disabled{opacity:.35}
+.navbtns .btn-know{border-radius:14px;padding:13px;font-weight:700;border:1.5px solid var(--know);background:var(--sheet);color:var(--know)}
+.navbtns .btn-know.on{background:var(--know);color:#fff}
+.kchip{position:absolute;top:16px;right:16px;font-size:12px;font-weight:700;color:#fff;background:var(--know);border-radius:20px;padding:3px 10px;display:none}
+.card.known .kchip{display:block}
+.card.known{border-color:var(--know)}
+.list li.here{background:var(--omr-soft)}
+.toast{position:fixed;left:50%;top:calc(18px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--ink);color:var(--sheet);padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;z-index:30}
 </style>
 </head>
 <body>
 
 <div class="app" id="app">
   <section id="home">
-    <div style="display:flex;flex-direction:column;gap:18px">
+    <div class="homewrap">
       <header class="top">
         <div class="brand"><small>CEFR 레벨 · 30일 완성</small><h1>영단어 30일</h1></div>
         <button class="iconbtn" id="toSettings">설정</button>
       </header>
       <div class="tabs" role="tablist" id="tabs"></div>
-      <div class="summary">
-        <div class="sumrow"><h2 id="lvName"></h2><div class="count"><b id="lvDone">0</b> / <span id="lvTotal">0</span> 단어</div></div>
-        <div class="bar"><i id="lvBar"></i></div>
+      <div class="daybar">
+        <button class="daytoggle" id="dayToggle" aria-expanded="false" aria-controls="omrPanel">
+          <span class="dl"><b id="dayLabel">DAY 1</b><small id="daySub"></small></span>
+          <span class="chev" id="chev">펼치기 ▾</span>
+        </button>
+        <button class="listbtn" id="toList">목록 보기</button>
       </div>
-      <div class="today">
-        <div><p>오늘 이어서 할 진도</p><strong id="todayLabel"></strong></div>
-        <button class="primary" id="todayGo">학습 시작</button>
-      </div>
-      <div class="omr">
-        <div class="omr-head"><span>DAY 1 – 30 진도표</span><span id="omrDone"></span></div>
+      <div class="bar thin"><i id="dayBar"></i></div>
+      <div class="omr" id="omrPanel" hidden>
+        <div class="omr-head"><span id="lvName"></span><span id="omrDone"></span></div>
         <div class="grid" id="grid"></div>
+        <p class="omr-foot"><span id="lvDone">0</span> / <span id="lvTotal">0</span> 단어 외움 · 날짜를 누르면 그날 카드로 이동해요</p>
       </div>
-      <p class="note">단어 출처: 올려주신 Langeek A1·A2·B1 단어 목록 (총 <span id="allCount"></span>개). 주제 순서 그대로 30일에 나눴어요.</p>
-    </div>
-  </section>
-
-  <section id="dayView" hidden>
-    <div class="sheet">
-      <button class="back" data-go="home">← 진도표</button>
-      <div class="sumrow"><h2 id="dayTitle"></h2><div class="count"><b id="dayDone">0</b> / <span id="dayTotal">0</span></div></div>
-      <div class="bar"><i id="dayBar"></i></div>
-      <div class="actions">
-        <button class="primary" id="startLeft">못 외운 단어 학습</button>
-        <button class="ghost" id="startAll">전체 다시 보기</button>
-      </div>
-      <ul class="list" id="dayList"></ul>
-    </div>
-  </section>
-
-  <section id="studyView" hidden>
-    <div class="study">
-      <div class="shead">
-        <button class="back" id="quitStudy">← 그만하기</button>
-        <div class="meta" id="studyMeta"></div>
-      </div>
-      <div class="bar"><i id="studyBar"></i></div>
       <div class="stack" id="stack"></div>
-      <div class="swipebtns" id="swipeBtns">
-        <button class="btn-again" id="btnAgain">← 다시 보기</button>
-        <button class="btn-know" id="btnKnow">외웠어요 →</button>
+      <div class="navbtns">
+        <button class="navb" id="prevBtn" aria-label="이전 단어">‹ 이전</button>
+        <button class="btn-know" id="knowBtn">외웠어요</button>
+        <button class="navb" id="nextBtn" aria-label="다음 단어">다음 ›</button>
       </div>
+      <p class="tip" id="tip">왼쪽으로 밀면 다음, 오른쪽으로 밀면 이전 단어예요. 순서는 바뀌지 않아요.</p>
       <div class="peek" id="peek" hidden>
         <div class="peek-top"><div><b id="pkW"></b> <span id="pkP"></span></div><button class="peek-x" id="pkX" aria-label="닫기">✕</button></div>
         <div class="peek-ko" id="pkK"></div>
         <p class="peek-def" id="pkD"></p>
       </div>
-      <p class="tip" id="tip">카드를 탭하면 발음을 다시 들려줘요. 오른쪽으로 밀면 외움, 왼쪽은 다시.</p>
+    </div>
+  </section>
+
+  <section id="dayView" hidden>
+    <div class="sheet">
+      <button class="back" data-go="home">← 카드로</button>
+      <div class="sumrow"><h2 id="dayTitle"></h2><div class="count"><b id="dayDone">0</b> / <span id="dayTotal">0</span></div></div>
+      <div class="bar"><i id="dayBar2"></i></div>
+      <ul class="list" id="dayList"></ul>
     </div>
   </section>
 
   <section id="settingsView" hidden>
     <div class="sheet">
-      <button class="back" data-go="home">← 진도표</button>
+      <button class="back" data-go="home">← 카드로</button>
       <h2>설정</h2>
-      <div class="settings">
-        <p>학습 순서</p>
-        <div class="actions">
-          <button class="ghost" id="ordTopic" aria-pressed="true">주제 순서대로</button>
-          <button class="ghost" id="ordShuffle" aria-pressed="false">카드 섞어서</button>
-        </div>
-      </div>
       <div class="settings">
         <p>발음 음성</p>
         <div class="actions">
@@ -268,65 +272,55 @@ const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){retu
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 let done=store.get("wl_done")||{};
 let level=store.get("wl_level")||"A1";if(!LV.includes(level))level="A1";
-let shuffle=!!store.get("wl_shuffle");
 let autoSpeak=store.get("wl_autospeak");if(autoSpeak===null)autoSpeak=true;
-let curDay=0;
+let POS=store.get("wl_pos")||{};
+let curDay=0,idx=0,expanded=false;
 const byLv={};LV.forEach(l=>byLv[l]=W.filter(w=>w.lv===l));
 const daysCache={};
 function daysOf(l){if(daysCache[l])return daysCache[l];const ws=byLv[l],n=ws.length,d=Array.from({length:30},()=>[]);
   ws.forEach((w,i)=>d[Math.floor(i*30/n)].push(w));return daysCache[l]=d}
 const cnt=a=>a.reduce((s,w)=>s+(done[w.id]?1:0),0);
 const save=()=>store.set("wl_done",done);
-function show(id){["home","dayView","studyView","settingsView"].forEach(s=>$(s).hidden=s!==id);window.scrollTo(0,0)}
+const savePos=()=>{POS[level]={d:curDay,i:idx};store.set("wl_pos",POS)};
+function show(id){["home","dayView","settingsView"].forEach(s=>$(s).hidden=s!==id);window.scrollTo(0,0)}
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{renderHome();show(b.dataset.go)});
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
-
-function renderHome(){
-  $("allCount").textContent=W.length.toLocaleString();
+function initPos(){const p=POS[level],d=daysOf(level);
+  if(p&&d[p.d]){curDay=p.d;idx=Math.min(p.i,d[p.d].length-1);return}
+  let n=d.findIndex(x=>cnt(x)<x.length);if(n<0)n=0;curDay=n;
+  const k=d[n].findIndex(w=>!done[w.id]);idx=k<0?0:k}
+function renderTabs(){
   $("tabs").innerHTML=LV.map(l=>`<button role="tab" aria-selected="${l===level}" data-l="${l}"><b>${l}</b><span>${byLv[l].length.toLocaleString()}단어</span></button>`).join("");
-  $("tabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{level=b.dataset.l;store.set("wl_level",level);renderHome();loadLevel(level)});
+  $("tabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{if(b.dataset.l===level)return;level=b.dataset.l;store.set("wl_level",level);initPos();loadLevel(level);renderHome()})}
+function renderDayBar(){
+  const x=daysOf(level)[curDay],c=cnt(x);
+  $("dayLabel").textContent=`${level} · DAY ${curDay+1}`;
+  $("daySub").textContent=`${idx+1} / ${x.length}번째 · ${c}개 외움`;
+  $("dayBar").style.width=(c/x.length*100)+"%";
+  $("omrPanel").hidden=!expanded;$("dayToggle").setAttribute("aria-expanded",expanded);
+  $("chev").textContent=expanded?"접기 ▴":"펼치기 ▾";
+  if(!expanded)return;
   const ws=byLv[level],d=daysOf(level),n=cnt(ws);
   $("lvName").textContent=`${level} · ${LVN[level]}`;
   $("lvDone").textContent=n.toLocaleString();$("lvTotal").textContent=ws.length.toLocaleString();
-  $("lvBar").style.width=(n/ws.length*100)+"%";
-  $("omrDone").textContent=`완료 ${d.filter(x=>cnt(x)===x.length).length} / 30일 · 하루 약 ${Math.round(ws.length/30)}개`;
+  $("omrDone").textContent=`완료 ${d.filter(x=>cnt(x)===x.length).length} / 30일`;
   $("grid").innerHTML=d.map((x,i)=>{const c=cnt(x),p=Math.round(c/x.length*100);
-    return `<button class="day ${c===x.length?"full":""}" data-d="${i}" aria-label="DAY ${i+1}, ${c}/${x.length}"><span class="bub" style="--p:${p}"><span>${i+1}</span></span><small>${c}/${x.length}</small></button>`}).join("");
-  $("grid").querySelectorAll(".day").forEach(b=>b.onclick=()=>openDay(+b.dataset.d));
-  const next=d.findIndex(x=>cnt(x)<x.length);
-  if(next<0){$("todayLabel").textContent="이 레벨을 모두 외웠어요";$("todayGo").disabled=true}
-  else{const x=d[next];const tp=[...new Set(x.map(w=>w.t))].slice(0,2).join(", ");
-    $("todayLabel").textContent=`DAY ${next+1} · 남은 ${x.length-cnt(x)}개`;$("todayLabel").title=tp;
-    $("todayGo").disabled=false;$("todayGo").onclick=()=>{curDay=next;startStudy(false)}}
+    return `<button class="day ${c===x.length?"full":""} ${i===curDay?"cur":""}" data-d="${i}" aria-label="DAY ${i+1}, ${c}/${x.length}"><span class="bub" style="--p:${p}"><span>${i+1}</span></span><small>${c}/${x.length}</small></button>`}).join("");
+  $("grid").querySelectorAll(".day").forEach(b=>b.onclick=()=>{curDay=+b.dataset.d;const k=daysOf(level)[curDay].findIndex(w=>!done[w.id]);idx=k<0?0:k;expanded=false;savePos();renderHome();if(autoSpeak)playWord(curWord())});
 }
-function openDay(i){curDay=i;renderDay();show("dayView")}
+$("dayToggle").onclick=()=>{expanded=!expanded;renderDayBar()};
+function renderHome(){renderTabs();renderDayBar();renderCard(0)}
 function renderDay(){
   const x=daysOf(level)[curDay],c=cnt(x);
   $("dayTitle").textContent=`${level} · DAY ${curDay+1}`;
   $("dayDone").textContent=c;$("dayTotal").textContent=x.length;
-  $("dayBar").style.width=(c/x.length*100)+"%";
-  $("startLeft").disabled=c===x.length;
-  $("startLeft").textContent=c===x.length?"모두 외웠어요":`못 외운 단어 학습 (${x.length-c})`;
-  $("dayList").innerHTML=x.map((w,i)=>{const on=!!done[w.id];return `<li><button class="chk" aria-pressed="${on}" data-i="${i}" aria-label="${esc(w.w)} 외움 표시">${on?"✓":""}</button>
+  $("dayBar2").style.width=(c/x.length*100)+"%";
+  $("dayList").innerHTML=x.map((w,i)=>{const on=!!done[w.id];return `<li class="${i===idx?"here":""}"><button class="chk" aria-pressed="${on}" data-i="${i}" aria-label="${esc(w.w)} 외움 표시">${on?"✓":""}</button>
     <button class="lw" data-open="${i}" aria-label="${esc(w.w)} 카드로 보기"><b>${esc(w.w)}</b><span class="pos">${esc(w.p)}</span><p>${esc(w.ko||w.def)}</p></button><span class="go" aria-hidden="true">›</span></li>`}).join("");
-  $("dayList").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>startStudyAt(+b.dataset.open));
+  $("dayList").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{idx=+b.dataset.open;savePos();renderHome();show("home");if(autoSpeak)playWord(curWord())});
   $("dayList").querySelectorAll(".chk").forEach(b=>b.onclick=()=>{const w=x[+b.dataset.i];if(done[w.id])delete done[w.id];else done[w.id]=1;save();renderDay()});
 }
-$("startLeft").onclick=()=>startStudy(false);
-$("startAll").onclick=()=>startStudy(true);
-
-let queue=[],total=0,known=0,again=0,revealed=false;
-function startStudy(all){
-  const x=daysOf(level)[curDay];
-  queue=(all?x:x.filter(w=>!done[w.id])).slice();
-  if(shuffle)for(let i=queue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[queue[i],queue[j]]=[queue[j],queue[i]]}
-  total=queue.length;known=0;again=0;show("studyView");renderStudy();
-}
-function startStudyAt(i){
-  const x=daysOf(level)[curDay];
-  queue=x.slice(i).concat(x.slice(0,i));
-  total=queue.length;known=0;again=0;show("studyView");renderStudy();
-}
+$("toList").onclick=()=>{renderDay();show("dayView");const h=document.querySelector("#dayList .here");if(h)h.scrollIntoView({block:"center"})};
 const LOOK={};W.forEach(w=>{const k=w.w.toLowerCase();if(!LOOK[k])LOOK[k]=w});
 function lookup(t){t=t.toLowerCase().replace(/[^a-z'-]/g,"");if(!t)return null;
   const c=[t];if(t.endsWith("ies"))c.push(t.slice(0,-3)+"y");if(t.endsWith("es"))c.push(t.slice(0,-2));if(t.endsWith("s"))c.push(t.slice(0,-1));
@@ -383,7 +377,7 @@ const spk=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8
 function cardHTML(w,under){
   return `<div class="card ${under?"under":""}">
     <div class="chips"><span class="lvchip">${w.lv}</span><span class="chip2">${esc(w.t||"")}</span><span class="chip2">${esc(w.p)}</span></div>
-    <div class="stamp k">외움</div><div class="stamp a">다시</div>
+    <div class="kchip">✓ 외움</div>
     <h2 class="word">${esc(w.w)}</h2>
     <div class="pron"><span>${esc(w.ipa)}</span>${canSpeak?`<button class="speak" aria-label="발음 듣기">${spk}</button>`:""}</div>
     ${under?"":`<div class="reveal" data-rev>
@@ -393,58 +387,50 @@ function cardHTML(w,under){
     </div>`}
   </div>`;
 }
-function renderStudy(){
-  const stack=$("stack");revealed=false;$("peek").hidden=true;
-  $("studyMeta").textContent=queue.length?`${level} DAY ${curDay+1} · 남은 ${queue.length}`:"";
-  $("studyBar").style.width=(total?known/total*100:0)+"%";
-  if(!queue.length){
-    $("swipeBtns").hidden=true;$("tip").hidden=true;stack.style.height="auto";
-    const x=daysOf(level)[curDay],c=cnt(x),hasNext=curDay<29;
-    stack.innerHTML=`<div class="result"><h2>${c===x.length?`DAY ${curDay+1} 완료!`:"이번 회차 끝"}</h2>
-      <div class="stats"><div><b>${known}</b><span>외웠어요</span></div><div><b>${again}</b><span>다시 본 횟수</span></div><div><b>${c}/${x.length}</b><span>DAY 진도</span></div></div>
-      <div class="actions"><button class="primary" id="rNext">${hasNext?"다음 DAY로":"진도표로"}</button><button class="ghost" id="rHome">진도표</button></div></div>`;
-    $("rHome").onclick=()=>{renderHome();show("home")};
-    $("rNext").onclick=()=>{if(hasNext){curDay++;startStudy(false)}else{renderHome();show("home")}};
-    return;
-  }
-  stack.style.height="";$("swipeBtns").hidden=false;$("tip").hidden=false;
-  stack.innerHTML=(queue[1]?cardHTML(queue[1],true):"")+cardHTML(queue[0],false);
+function curWord(){return daysOf(level)[curDay][idx]}
+function renderCard(dir){
+  const stack=$("stack"),w=curWord();$("peek").hidden=true;
+  stack.innerHTML=cardHTML(w,false);
   const card=stack.lastElementChild,sp=card.querySelector(".speak");
-  if(sp){sp.addEventListener("pointerdown",e=>{unlock();e.stopPropagation()});sp.onclick=e=>{e.stopPropagation();playWord(queue[0])}}
+  if(done[w.id])card.classList.add("known");
+  if(dir&&!matchMedia("(prefers-reduced-motion: reduce)").matches){card.style.transform=`translateX(${dir*60}%)`;card.style.opacity="0";
+    requestAnimationFrame(()=>{card.classList.add("anim");card.style.transform="";card.style.opacity=""})}
+  if(sp){sp.addEventListener("pointerdown",e=>{unlock();e.stopPropagation()});sp.onclick=e=>{e.stopPropagation();playWord(w)}}
   bindSwipe(card);
-  if(autoSpeak)playWord(queue[0]);if(queue[1])loadLevel(queue[1].lv);
+  const kb=$("knowBtn");kb.textContent=done[w.id]?"✓ 외웠어요":"외웠어요";kb.classList.toggle("on",!!done[w.id]);
+  const d=daysOf(level);$("prevBtn").disabled=curDay===0&&idx===0;$("nextBtn").disabled=curDay===29&&idx===d[29].length-1;
+  if(dir&&autoSpeak)playWord(w);
 }
-function toggleReveal(card){if(queue[0])playWord(queue[0])}
+function move(step){
+  const d=daysOf(level);let nd=curDay,ni=idx+step;
+  if(ni>=d[nd].length){if(nd===29)return;nd++;ni=0}
+  if(ni<0){if(nd===0)return;nd--;ni=d[nd].length-1}
+  const card=$("stack").lastElementChild;
+  const finish=()=>{const dayChanged=nd!==curDay;curDay=nd;idx=ni;savePos();renderDayBar();renderCard(step>0?1:-1);if(dayChanged)toast(`DAY ${curDay+1} 시작`)};
+  if(card&&!matchMedia("(prefers-reduced-motion: reduce)").matches){card.classList.add("anim");card.style.transform=`translateX(${step>0?-110:110}%)`;card.style.opacity="0";setTimeout(finish,170)}else finish();
+}
+function toggleKnow(){const w=curWord();if(done[w.id]){delete done[w.id];save();renderDayBar();renderCard(0)}
+  else{done[w.id]=1;save();renderDayBar();const c=$("stack").lastElementChild;if(c)c.classList.add("known");const kb=$("knowBtn");kb.textContent="✓ 외웠어요";kb.classList.add("on");setTimeout(()=>move(1),260)}}
+let toastT;function toast(t){let el=$("toast");if(!el){el=document.createElement("div");el.id="toast";el.className="toast";document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,1400)}
+function toggleReveal(){playWord(curWord())}
 function bindSwipe(card){
-  let sx=0,sy=0,dx=0,drag=false,moved=false;
-  const sk=card.querySelector(".stamp.k"),sa=card.querySelector(".stamp.a");
-  card.addEventListener("pointerdown",e=>{drag=true;moved=false;sx=e.clientX;sy=e.clientY;dx=0;card.classList.remove("anim");try{card.setPointerCapture(e.pointerId)}catch(_){}});
+  let sx=0,sy=0,dx=0,drag=false,moved=false,horiz=null;
+  card.addEventListener("pointerdown",e=>{drag=true;moved=false;horiz=null;sx=e.clientX;sy=e.clientY;dx=0;card.classList.remove("anim");try{card.setPointerCapture(e.pointerId)}catch(_){}});
   card.addEventListener("pointermove",e=>{if(!drag)return;dx=e.clientX-sx;const dy=e.clientY-sy;
-    if(Math.abs(dx)>6||Math.abs(dy)>6)moved=true;
-    card.style.transform=`translateX(${dx}px) rotate(${dx/22}deg)`;
-    sk.style.opacity=Math.max(0,Math.min(1,dx/90));sa.style.opacity=Math.max(0,Math.min(1,-dx/90))});
+    if(Math.abs(dx)>6||Math.abs(dy)>6)moved=true;if(horiz===null&&moved)horiz=Math.abs(dx)>Math.abs(dy);
+    if(horiz)card.style.transform=`translateX(${dx}px)`});
   const end=()=>{if(!drag)return;drag=false;
-    if(dx>90)commit("know");else if(dx<-90)commit("again");
-    else{card.classList.add("anim");card.style.transform="";sk.style.opacity=0;sa.style.opacity=0;if(!moved)toggleReveal(card)}};
+    if(horiz&&dx<-70)move(1);else if(horiz&&dx>70)move(-1);
+    else{card.classList.add("anim");card.style.transform="";if(!moved)toggleReveal()}};
   card.addEventListener("pointerup",end);card.addEventListener("pointercancel",()=>{moved=true;dx=0;end()});
 }
-function commit(kind){
-  if(!queue.length)return;
-  const card=$("stack").lastElementChild,w=queue[0];
-  card.classList.add("anim");
-  card.style.transform=`translateX(${kind==="know"?140:-140}%) rotate(${kind==="know"?14:-14}deg)`;card.style.opacity=0;
-  if(kind==="know"){done[w.id]=1;save();known++;queue.shift()}else{again++;queue.push(queue.shift())}
-  setTimeout(renderStudy,matchMedia("(prefers-reduced-motion: reduce)").matches?0:200);
-}
-$("btnKnow").onclick=()=>commit("know");
-$("btnAgain").onclick=()=>commit("again");
-$("quitStudy").onclick=()=>{renderDay();show("dayView")};
-document.addEventListener("keydown",e=>{if($("studyView").hidden||!queue.length)return;
-  if(e.key==="ArrowRight")commit("know");else if(e.key==="ArrowLeft")commit("again");
-  else if(e.key===" "){e.preventDefault();toggleReveal($("stack").lastElementChild)}});
+$("prevBtn").onclick=()=>move(-1);
+$("nextBtn").onclick=()=>move(1);
+$("knowBtn").onclick=()=>toggleKnow();
+document.addEventListener("keydown",e=>{if($("home").hidden)return;
+  if(e.key==="ArrowRight")move(1);else if(e.key==="ArrowLeft")move(-1);
+  else if(e.key===" "){e.preventDefault();toggleReveal()}else if(e.key==="Enter")toggleKnow()});
 
-function setOrd(){$("ordTopic").setAttribute("aria-pressed",!shuffle);$("ordShuffle").setAttribute("aria-pressed",shuffle);
-  $("ordTopic").className=shuffle?"ghost":"primary";$("ordShuffle").className=shuffle?"primary":"ghost"}
 $("voiceSel").onchange=e=>{voiceName=e.target.value;store.set("wl_voice",voiceName);speak("Hello, nice to meet you.")};
 function setRec(){$("recOn").className=useRec?"primary":"ghost";$("recOff").className=useRec?"ghost":"primary"}
 $("recOn").onclick=()=>{useRec=true;store.set("wl_rec",true);setRec();playWord(W[0])};
@@ -453,13 +439,12 @@ $("voiceTest").onclick=()=>{const w=W.find(x=>x.w==="delicious")||W[0];playWord(
 function setSp(){$("spOn").className=autoSpeak?"primary":"ghost";$("spOff").className=autoSpeak?"ghost":"primary"}
 $("spOn").onclick=()=>{autoSpeak=true;store.set("wl_autospeak",true);setSp()};
 $("spOff").onclick=()=>{autoSpeak=false;store.set("wl_autospeak",false);setSp()};
-$("ordTopic").onclick=()=>{shuffle=false;store.set("wl_shuffle",false);setOrd()};
-$("ordShuffle").onclick=()=>{shuffle=true;store.set("wl_shuffle",true);setOrd()};
 function twoStep(btn,label,fn){let armed=false,t;btn.onclick=()=>{if(!armed){armed=true;btn.textContent="한 번 더 누르면 지워요";t=setTimeout(()=>{armed=false;btn.textContent=label},3000)}else{clearTimeout(t);armed=false;btn.textContent=label;fn()}}}
 const setMsg=t=>{$("setMsg").hidden=false;$("setMsg").textContent=t};
-twoStep($("resetLv"),"현재 레벨 진도 지우기",()=>{byLv[level].forEach(w=>delete done[w.id]);save();setMsg(`${level} 진도를 지웠어요.`)});
-twoStep($("resetAll"),"전체 진도 지우기",()=>{done={};store.del("wl_done");setMsg("전체 진도를 지웠어요.")});
-$("toSettings").onclick=()=>{$("setMsg").hidden=true;setOrd();setSp();setRec();loadVoices();show("settingsView")};
+twoStep($("resetLv"),"현재 레벨 진도 지우기",()=>{byLv[level].forEach(w=>delete done[w.id]);save();delete POS[level];store.set("wl_pos",POS);initPos();setMsg(`${level} 진도를 지웠어요.`)});
+twoStep($("resetAll"),"전체 진도 지우기",()=>{done={};store.del("wl_done");POS={};store.del("wl_pos");initPos();setMsg("전체 진도를 지웠어요.")});
+$("toSettings").onclick=()=>{$("setMsg").hidden=true;setSp();setRec();loadVoices();show("settingsView")};
+initPos();
 renderHome();
 loadLevel(level);
 </script>
