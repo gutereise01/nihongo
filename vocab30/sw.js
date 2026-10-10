@@ -1,8 +1,8 @@
 // 오프라인 캐시: 처음 한 번 열면 이후에는 인터넷 없이도 동작
-const CACHE = "vocab30-v2";
+const CACHE = "vocab30-v3";
 const CORE = ["./", "index.html", "manifest.webmanifest",
   "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png",
-  "audio/audio-A1.json", "audio/audio-A2.json", "audio/audio-B1.json"];
+  "audio/audio-A1.json", "audio/audio-A2.json", "audio/audio-B1.json", "audio/audio-B2.json"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
 });

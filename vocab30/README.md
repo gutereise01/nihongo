@@ -1,6 +1,6 @@
 # 영단어 30일
 
-A1·A2·B1 영단어 4,039개를 레벨별 30일 진도표와 스와이프 카드로 외우는 단어장 웹앱입니다.
+A1·A2·B1·B2 영단어 6,263개를 레벨별 30일 진도표와 스와이프 카드로 외우는 단어장 웹앱입니다.
 한국어 뜻, 영어 정의, 예문, 자연 음성 발음이 들어 있고, 아이폰 홈 화면에 추가하면 앱처럼 동작합니다.
 
 ## GitHub Pages로 올리기
@@ -8,7 +8,7 @@ A1·A2·B1 영단어 4,039개를 레벨별 30일 진도표와 스와이프 카�
 1. GitHub에서 새 저장소(Repository)를 만듭니다. 예: `vocab30` (Public)
 2. 이 폴더의 파일을 **폴더 구조 그대로** 올립니다.
    - `index.html`, `manifest.webmanifest`, `sw.js`, `README.md`
-   - `audio/` 폴더 (audio-A1.json, audio-A2.json, audio-B1.json)
+   - `audio/` 폴더 (audio-A1.json ~ audio-B2.json)
    - `icons/` 폴더 (아이콘 4개)
 3. 저장소의 **Settings → Pages**에서
    - Source: **Deploy from a branch**
@@ -25,6 +25,6 @@ A1·A2·B1 영단어 4,039개를 레벨별 30일 진도표와 스와이프 카�
 ## 참고
 
 - 진도 기록은 각자의 기기(브라우저)에 저장됩니다.
-- 단어 출처: Langeek CEFR A1·A2·B1 단어 목록. 한국어 뜻과 예문은 별도로 작성했습니다.
+- 단어 출처: Langeek CEFR A1·A2·B1·B2 단어 목록. 한국어 뜻과 예문은 별도로 작성했습니다.
 - 발음은 Piper 신경망 음성(en-US lessac)으로 미리 녹음했습니다.
 - 앱을 수정한 뒤 다시 올릴 때는 `sw.js`의 `CACHE` 이름(예: `vocab30-v2`)도 바꿔야 설치된 앱에 새 버전이 반영됩니다.
