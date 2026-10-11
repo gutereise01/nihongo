@@ -338,7 +338,11 @@ function lookup(t){t=t.toLowerCase().replace(/[’]/g,"'").replace(/[^a-z'-]/g,"
 function linkDef(s){return String(s).split(/(\s+)/).map(p=>{if(/^\s+$/.test(p)||!p)return p;
   const m=p.match(/^([^A-Za-z]*)([A-Za-z][A-Za-z'’-]*)([^A-Za-z]*)$/);if(!m)return esc(p);
   return esc(m[1])+`<span class="dw" data-w="${esc(m[2])}">${esc(m[2])}</span>`+esc(m[3])}).join("")}
-function peek(t){const w=lookup(t);if(w&&w.w.toLowerCase()===t.toLowerCase())playWord(w);else speak(t);
+function normT(t){return t.toLowerCase().replace(/[’]/g,"'").replace(/[^a-z'-]/g,"").replace(/'s$/,"").replace(/^['-]+|['-]+$/g,"")}
+function peek(t){const w=lookup(t),k=normT(t);
+  if(w&&w.w.toLowerCase()===k)playWord(w);
+  else if(useRec){const lv=k[0]<="l"?"FORMS-1":"FORMS-2";loadLevel(lv).then(m=>{if(m&&m[k])playWord({id:k,lv,w:t});else speak(t)})}
+  else speak(t);
   $("pkW").textContent=w?w.w:t;$("pkP").textContent=w?`${w.p} · ${w.lv==="SUP"?"보충 사전":w.lv}`:"";
   $("pkK").textContent=w?(w.ko||""):"이 단어장에는 없는 단어예요";$("pkD").textContent=w?(w.def||w.ipa||""):"";$("peek").hidden=false}
 $("pkX").onclick=()=>{$("peek").hidden=true};
@@ -464,6 +468,7 @@ $("toSettings").onclick=()=>{$("setMsg").hidden=true;setSp();setRec();loadVoices
 initPos();
 renderHome();
 loadLevel(level);
+setTimeout(()=>{loadLevel("SUP");loadLevel("FORMS-1");loadLevel("FORMS-2")},4000);
 </script>
 
 <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}</script>
