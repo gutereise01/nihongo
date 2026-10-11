@@ -181,9 +181,22 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
 .card.known{border-color:var(--know)}
 .list li.here{background:var(--omr-soft)}
 .toast{position:fixed;left:50%;top:calc(18px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--ink);color:var(--sheet);padding:8px 16px;border-radius:20px;font-size:14px;font-weight:600;z-index:30}
+.moderow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:var(--sheet);padding:3px;gap:2px}
+.seg button{border:0;background:transparent;border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--omr);color:#fff}
+.seg button span{display:inline-block;min-width:1.4em;padding:0 5px;margin-left:3px;border-radius:999px;background:var(--omr-soft);color:var(--omr);font-size:12px;font-variant-numeric:tabular-nums}
+.seg button[aria-pressed="true"] span{background:rgba(255,255,255,.25);color:#fff}
+.seg.sm button{padding:6px 11px;font-size:12.5px}
+.revmode .daytoggle{border-color:var(--omr);background:var(--omr-soft)}
+.card.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:28px 20px}
+.card.empty .emp-t{font-size:17px;font-weight:700;margin:0}
+.card.empty .emp-s{font-size:14px;color:var(--muted);margin:0 0 6px}
+.list .emptyli{padding:24px 8px;text-align:center;color:var(--muted)}
 </style>
 </head>
 <body>
+
 
 <div class="app" id="app">
   <section id="home">
@@ -199,6 +212,16 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
           <span class="chev" id="chev">펼치기 ▾</span>
         </button>
         <button class="listbtn" id="toList">목록 보기</button>
+      </div>
+      <div class="moderow" id="modeRow">
+        <div class="seg" role="group" aria-label="보기 모드">
+          <button id="modeAll" aria-pressed="true">전체 단어</button>
+          <button id="modeRev" aria-pressed="false">체크한 단어 <span id="revN">0</span></button>
+        </div>
+        <div class="seg sm" id="scopeSeg" role="group" aria-label="복습 범위" hidden>
+          <button id="scopeDay" aria-pressed="true">이 DAY</button>
+          <button id="scopeLv" aria-pressed="false">레벨 전체</button>
+        </div>
       </div>
       <div class="bar thin"><i id="dayBar"></i></div>
       <div class="omr" id="omrPanel" hidden>
@@ -278,6 +301,7 @@ let level=store.get("wl_level")||"A1";if(!LV.includes(level))level="A1";
 let autoSpeak=store.get("wl_autospeak");if(autoSpeak===null)autoSpeak=true;
 let POS=store.get("wl_pos")||{};
 let curDay=0,idx=0,expanded=false;
+let rev=false,revAll=false,R=[],ridx=0;
 const byLv={};LV.forEach(l=>byLv[l]=W.filter(w=>w.lv===l));
 const daysCache={};
 function daysOf(l){if(daysCache[l])return daysCache[l];const ws=byLv[l],n=ws.length,d=Array.from({length:30},()=>[]);
@@ -294,11 +318,20 @@ function initPos(){const p=POS[level],d=daysOf(level);
   const k=d[n].findIndex(w=>!done[w.id]);idx=k<0?0:k}
 function renderTabs(){
   $("tabs").innerHTML=LV.map(l=>`<button role="tab" aria-selected="${l===level}" data-l="${l}"><b>${l}</b><span>${byLv[l].length.toLocaleString()}단어</span></button>`).join("");
-  $("tabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{if(b.dataset.l===level)return;level=b.dataset.l;store.set("wl_level",level);initPos();loadLevel(level);renderHome()})}
+  $("tabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{if(b.dataset.l===level)return;level=b.dataset.l;store.set("wl_level",level);initPos();loadLevel(level);if(rev)buildRev();renderHome()})}
+function renderMode(){
+  const n=revSrc().filter(w=>done[w.id]).length;$("revN").textContent=n;
+  $("modeAll").setAttribute("aria-pressed",!rev);$("modeRev").setAttribute("aria-pressed",rev);
+  $("scopeSeg").hidden=!rev;$("scopeDay").setAttribute("aria-pressed",!revAll);$("scopeLv").setAttribute("aria-pressed",revAll);
+  $("scopeDay").textContent=`DAY ${curDay+1}`;
+  $("app").classList.toggle("revmode",rev)}
 function renderDayBar(){
+  renderMode();
   const x=daysOf(level)[curDay],c=cnt(x);
   $("dayLabel").textContent=`${level} · DAY ${curDay+1}`;
   $("daySub").textContent=`${idx+1} / ${x.length}번째 · ${c}개 외움`;
+  if(rev){$("dayLabel").textContent=revAll?`${level} · 레벨 전체 복습`:`${level} · DAY ${curDay+1} 복습`;
+    $("daySub").textContent=R.length?`${ridx+1} / ${R.length} · 체크한 단어만 보는 중`:"체크한 단어가 아직 없어요"}
   $("dayBar").style.width=(c/x.length*100)+"%";
   $("omrPanel").hidden=!expanded;$("dayToggle").setAttribute("aria-expanded",expanded);
   $("chev").textContent=expanded?"접기 ▴":"펼치기 ▾";
@@ -309,18 +342,20 @@ function renderDayBar(){
   $("omrDone").textContent=`완료 ${d.filter(x=>cnt(x)===x.length).length} / 30일`;
   $("grid").innerHTML=d.map((x,i)=>{const c=cnt(x),p=Math.round(c/x.length*100);
     return `<button class="day ${c===x.length?"full":""} ${i===curDay?"cur":""}" data-d="${i}" aria-label="DAY ${i+1}, ${c}/${x.length}"><span class="bub" style="--p:${p}"><span>${i+1}</span></span><small>${c}/${x.length}</small></button>`}).join("");
-  $("grid").querySelectorAll(".day").forEach(b=>b.onclick=()=>{curDay=+b.dataset.d;const k=daysOf(level)[curDay].findIndex(w=>!done[w.id]);idx=k<0?0:k;expanded=false;savePos();renderHome();if(autoSpeak)playWord(curWord())});
+  $("grid").querySelectorAll(".day").forEach(b=>b.onclick=()=>{curDay=+b.dataset.d;const k=daysOf(level)[curDay].findIndex(w=>!done[w.id]);idx=k<0?0:k;expanded=false;savePos();if(rev)buildRev();renderHome();const cw=curWord();if(autoSpeak&&cw)playWord(cw)});
 }
 $("dayToggle").onclick=()=>{expanded=!expanded;renderDayBar()};
 function renderHome(){renderTabs();renderDayBar();renderCard(0)}
 function renderDay(){
-  const x=daysOf(level)[curDay],c=cnt(x);
-  $("dayTitle").textContent=`${level} · DAY ${curDay+1}`;
+  const x=rev?R:daysOf(level)[curDay],c=cnt(x);
+  $("dayTitle").textContent=rev?(revAll?`${level} · 체크한 단어 (레벨 전체)`:`${level} · DAY ${curDay+1} 체크한 단어`):`${level} · DAY ${curDay+1}`;
   $("dayDone").textContent=c;$("dayTotal").textContent=x.length;
-  $("dayBar2").style.width=(c/x.length*100)+"%";
-  $("dayList").innerHTML=x.map((w,i)=>{const on=!!done[w.id];return `<li class="${i===idx?"here":""}"><button class="chk" aria-pressed="${on}" data-i="${i}" aria-label="${esc(w.w)} 외움 표시">${on?"✓":""}</button>
+  $("dayBar2").style.width=(x.length?c/x.length*100:0)+"%";
+  const cur=rev?ridx:idx;
+  if(!x.length){$("dayList").innerHTML=`<li class="emptyli">체크한 단어가 아직 없어요</li>`;return}
+  $("dayList").innerHTML=x.map((w,i)=>{const on=!!done[w.id];return `<li class="${i===cur?"here":""}"><button class="chk" aria-pressed="${on}" data-i="${i}" aria-label="${esc(w.w)} 외움 표시">${on?"✓":""}</button>
     <button class="lw" data-open="${i}" aria-label="${esc(w.w)} 카드로 보기"><b>${esc(w.w)}</b><span class="pos">${esc(w.p)}</span><p>${esc(w.ko||w.def)}</p></button><span class="go" aria-hidden="true">›</span></li>`}).join("");
-  $("dayList").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{idx=+b.dataset.open;savePos();renderHome();show("home");if(autoSpeak)playWord(curWord())});
+  $("dayList").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{if(rev)ridx=+b.dataset.open;else{idx=+b.dataset.open;savePos()}renderHome();show("home");if(autoSpeak)playWord(curWord())});
   $("dayList").querySelectorAll(".chk").forEach(b=>b.onclick=()=>{const w=x[+b.dataset.i];if(done[w.id])delete done[w.id];else done[w.id]=1;save();renderDay()});
 }
 $("toList").onclick=()=>{renderDay();show("dayView");const h=document.querySelector("#dayList .here");if(h)h.scrollIntoView({block:"center"})};
@@ -408,9 +443,15 @@ function cardHTML(w,under){
     </div>`}
   </div>`;
 }
-function curWord(){return daysOf(level)[curDay][idx]}
+function revSrc(){return revAll?byLv[level]:daysOf(level)[curDay]}
+function buildRev(){R=revSrc().filter(w=>done[w.id]);ridx=0}
+function setRev(on,all){rev=on;if(all!==undefined)revAll=all;if(rev)buildRev();renderHome();if(rev&&R.length&&autoSpeak)playWord(curWord())}
+function curWord(){return rev?R[ridx]:daysOf(level)[curDay][idx]}
 function renderCard(dir){
   const stack=$("stack"),w=curWord();$("peek").hidden=true;
+  if(!w){stack.innerHTML=`<div class="card empty"><p class="emp-t">${revAll?"이 레벨":`DAY ${curDay+1}`}에 체크한 단어가 아직 없어요</p><p class="emp-s">카드에서 ‘외웠어요’를 누른 단어가 여기에 모여요.</p><button class="ghost" id="backAll">전체 단어로 돌아가기</button></div>`;
+    $("backAll").onclick=()=>setRev(false);["prevBtn","nextBtn","knowBtn"].forEach(i=>$(i).disabled=true);$("knowBtn").textContent="외웠어요";$("knowBtn").classList.remove("on");return}
+  $("knowBtn").disabled=false;
   stack.innerHTML=cardHTML(w,false);
   const card=stack.lastElementChild,sp=card.querySelector(".speak");
   if(done[w.id])card.classList.add("known");
@@ -419,10 +460,14 @@ function renderCard(dir){
   if(sp){sp.addEventListener("pointerdown",e=>{unlock();e.stopPropagation()});sp.onclick=e=>{e.stopPropagation();playWord(w)}}
   bindSwipe(card);
   const kb=$("knowBtn");kb.textContent=done[w.id]?"✓ 외웠어요":"외웠어요";kb.classList.toggle("on",!!done[w.id]);
-  const d=daysOf(level);$("prevBtn").disabled=curDay===0&&idx===0;$("nextBtn").disabled=curDay===29&&idx===d[29].length-1;
+  if(rev){kb.textContent=done[w.id]?"✓ 외웠어요 (누르면 해제)":"다시 외웠어요";$("prevBtn").disabled=ridx===0;$("nextBtn").disabled=ridx===R.length-1}
+  else{const d=daysOf(level);$("prevBtn").disabled=curDay===0&&idx===0;$("nextBtn").disabled=curDay===29&&idx===d[29].length-1}
   if(dir&&autoSpeak)playWord(w);
 }
 function move(step){
+  if(rev){const ni=ridx+step;if(ni<0||ni>=R.length){toast(ni<0?"첫 단어예요":"복습 끝! 마지막 단어예요");return}
+    const card=$("stack").lastElementChild;const fin=()=>{ridx=ni;renderDayBar();renderCard(step>0?1:-1)};
+    if(card&&!matchMedia("(prefers-reduced-motion: reduce)").matches){card.classList.add("anim");card.style.transform=`translateX(${step>0?-110:110}%)`;card.style.opacity="0";setTimeout(fin,170)}else fin();return}
   const d=daysOf(level);let nd=curDay,ni=idx+step;
   if(ni>=d[nd].length){if(nd===29)return;nd++;ni=0}
   if(ni<0){if(nd===0)return;nd--;ni=d[nd].length-1}
@@ -430,7 +475,8 @@ function move(step){
   const finish=()=>{const dayChanged=nd!==curDay;curDay=nd;idx=ni;savePos();renderDayBar();renderCard(step>0?1:-1);if(dayChanged)toast(`DAY ${curDay+1} 시작`)};
   if(card&&!matchMedia("(prefers-reduced-motion: reduce)").matches){card.classList.add("anim");card.style.transform=`translateX(${step>0?-110:110}%)`;card.style.opacity="0";setTimeout(finish,170)}else finish();
 }
-function toggleKnow(){const w=curWord();if(done[w.id]){delete done[w.id];save();renderDayBar();renderCard(0)}
+function toggleKnow(){const w=curWord();if(!w)return;
+  if(rev){if(done[w.id])delete done[w.id];else done[w.id]=1;save();renderDayBar();renderCard(0);if(!done[w.id])toast("체크를 풀었어요 · 학습 목록으로 돌아가요");return}if(done[w.id]){delete done[w.id];save();renderDayBar();renderCard(0)}
   else{done[w.id]=1;save();renderDayBar();const c=$("stack").lastElementChild;if(c)c.classList.add("known");const kb=$("knowBtn");kb.textContent="✓ 외웠어요";kb.classList.add("on");setTimeout(()=>move(1),260)}}
 let toastT;function toast(t){let el=$("toast");if(!el){el=document.createElement("div");el.id="toast";el.className="toast";document.body.appendChild(el)}el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,1400)}
 function toggleReveal(){playWord(curWord())}
@@ -446,6 +492,10 @@ function bindSwipe(card){
   card.addEventListener("pointerup",end);card.addEventListener("pointercancel",()=>{moved=true;dx=0;end()});
 }
 $("prevBtn").onclick=()=>move(-1);
+$("modeAll").onclick=()=>{if(rev)setRev(false)};
+$("modeRev").onclick=()=>{if(!rev)setRev(true)};
+$("scopeDay").onclick=()=>{if(revAll)setRev(true,false)};
+$("scopeLv").onclick=()=>{if(!revAll)setRev(true,true)};
 $("nextBtn").onclick=()=>move(1);
 $("knowBtn").onclick=()=>toggleKnow();
 document.addEventListener("keydown",e=>{if($("home").hidden)return;
