@@ -16,16 +16,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Prepare web assets
         run: |
@@ -61,12 +61,19 @@ jobs:
         run: |
           RES=app/src/main/res
           rm -rf $RES/mipmap-anydpi-v26
-          for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
-            n=${d%%:*}; s=${d##*:}
-            convert ../www/icons/icon-512.png -resize ${s}x${s} $RES/mipmap-$n/ic_launcher.png
-            cp $RES/mipmap-$n/ic_launcher.png $RES/mipmap-$n/ic_launcher_round.png
-            rm -f $RES/mipmap-$n/ic_launcher_foreground.png
-          done
+          pip install --quiet pillow
+          python3 - <<'EOF'
+          from PIL import Image
+          import os
+          src=Image.open('../www/icons/icon-512.png').convert('RGBA')
+          for n,s in [('mdpi',48),('hdpi',72),('xhdpi',96),('xxhdpi',144),('xxxhdpi',192)]:
+              d=f'app/src/main/res/mipmap-{n}'
+              os.makedirs(d,exist_ok=True)
+              im=src.resize((s,s),Image.LANCZOS)
+              im.save(f'{d}/ic_launcher.png'); im.save(f'{d}/ic_launcher_round.png')
+              f=f'{d}/ic_launcher_foreground.png'
+              if os.path.exists(f): os.remove(f)
+          EOF
           sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" app/build.gradle
           grep -n "versionCode\|versionName" app/build.gradle
 
