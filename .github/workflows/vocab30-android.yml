@@ -61,7 +61,7 @@ jobs:
         run: |
           RES=app/src/main/res
           rm -rf $RES/mipmap-anydpi-v26
-          pip install --quiet pillow
+          python3 -m pip install --quiet --break-system-packages pillow || python3 -m pip install --quiet pillow
           python3 - <<'EOF'
           from PIL import Image
           import os
