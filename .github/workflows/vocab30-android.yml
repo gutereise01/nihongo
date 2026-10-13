@@ -1,0 +1,98 @@
+name: vocab30 Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "vocab30/**"
+      - "vocab30-android/**"
+      - ".github/workflows/vocab30-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Prepare web assets
+        run: |
+          mkdir -p app/www
+          cp -r vocab30/index.html vocab30/manifest.webmanifest vocab30/icons vocab30/audio app/www/
+          # 앱 안에서는 서비스 워커(오프라인 캐시)가 필요 없음: 파일이 APK 안에 들어 있음
+          python3 - <<'EOF'
+          import re
+          p='app/www/index.html'
+          s=open(p,encoding='utf-8').read()
+          s=re.sub(r'<script>if\("serviceWorker" in navigator\).*?</script>','',s,flags=re.S)
+          open(p,'w',encoding='utf-8').write(s)
+          EOF
+
+      - name: Create Capacitor project
+        working-directory: app
+        run: |
+          npm init -y >/dev/null
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "io.github.gutereise01.vocab30",
+            "appName": "영단어 30일",
+            "webDir": "www",
+            "android": { "backgroundColor": "#f4f8ff" }
+          }
+          EOF
+          npx cap add android
+          npx cap sync android
+
+      - name: App icons, version
+        working-directory: app/android
+        run: |
+          RES=app/src/main/res
+          rm -rf $RES/mipmap-anydpi-v26
+          for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            n=${d%%:*}; s=${d##*:}
+            convert ../www/icons/icon-512.png -resize ${s}x${s} $RES/mipmap-$n/ic_launcher.png
+            cp $RES/mipmap-$n/ic_launcher.png $RES/mipmap-$n/ic_launcher_round.png
+            rm -f $RES/mipmap-$n/ic_launcher_foreground.png
+          done
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" app/build.gradle
+          grep -n "versionCode\|versionName" app/build.gradle
+
+      - name: Build release APK
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -q
+
+      - name: Sign APK
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          IN=app/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          $BT/zipalign -f -p 4 $IN aligned.apk
+          $BT/apksigner sign --ks vocab30-android/vocab30.keystore --ks-key-alias vocab30 \
+            --ks-pass pass:vocab30pass --key-pass pass:vocab30pass --out vocab30.apk aligned.apk
+          $BT/apksigner verify vocab30.apk
+          ls -la vocab30.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: vocab30-android
+          name: 영단어 30일 안드로이드 앱
+          body: |
+            영단어 30일 안드로이드 설치 파일(APK)입니다. 빌드 번호 ${{ github.run_number }}.
+            휴대폰에서 vocab30.apk를 내려받아 설치하세요. 처음 설치할 때 "출처를 알 수 없는 앱 설치"를 허용해야 해요.
+          files: vocab30.apk
+          make_latest: true

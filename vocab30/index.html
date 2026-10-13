@@ -193,6 +193,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
 .card.empty .emp-t{font-size:17px;font-weight:700;margin:0}
 .card.empty .emp-s{font-size:14px;color:var(--muted);margin:0 0 6px}
 .list .emptyli{padding:24px 8px;text-align:center;color:var(--muted)}
+.topbtns{display:flex;gap:6px;align-items:center}
 </style>
 </head>
 <body>
@@ -203,7 +204,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
     <div class="homewrap">
       <header class="top">
         <div class="brand"><small>CEFR 레벨 · 30일 완성</small><h1>영단어 30일</h1></div>
-        <button class="iconbtn" id="toSettings">설정</button>
+        <div class="topbtns"><button class="iconbtn" id="toSettings">설정</button></div>
       </header>
       <div class="tabs" role="tablist" id="tabs"></div>
       <div class="daybar">
@@ -522,5 +523,11 @@ setTimeout(()=>{loadLevel("SUP");loadLevel("FORMS-1");loadLevel("FORMS-2")},4000
 </script>
 
 <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}</script>
+<script>(function(){let ev=null;const isApp=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();ev=e;if(isApp)return;let b=document.getElementById("installBtn");
+ if(!b){b=document.createElement("button");b.id="installBtn";b.className="iconbtn";b.textContent="앱 설치";b.style.marginRight="6px";
+  const s=document.getElementById("toSettings");s.parentNode.insertBefore(b,s);
+  b.onclick=()=>{if(!ev)return;ev.prompt();ev.userChoice.finally(()=>{ev=null;b.remove()})}}});
+window.addEventListener("appinstalled",()=>{const b=document.getElementById("installBtn");if(b)b.remove()});})();</script>
 </body>
 </html>
